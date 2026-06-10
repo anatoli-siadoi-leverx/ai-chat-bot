@@ -1,6 +1,9 @@
 namespace Worker;
 
-public class Worker(ILogger<Worker> logger) : BackgroundService
+/// <summary>
+/// Placeholder background service. Will be replaced by ErrorPollingWorker in Stage 9.
+/// </summary>
+public class DefaultWorker(ILogger<DefaultWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -10,7 +13,7 @@ public class Worker(ILogger<Worker> logger) : BackgroundService
             {
                 logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
             }
-            await Task.Delay(1000, stoppingToken);
+            await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
         }
     }
 }
