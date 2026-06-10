@@ -13,7 +13,9 @@ builder.Services.AddControllers();
 builder.Services.Configure<OpenAiOptions>(
     builder.Configuration.GetSection(OpenAiOptions.SectionName));
 
-builder.Services.AddSingleton<ILlmService, OpenAiService>();
+// Stage 5: AgentService wraps the OpenAI chat loop with tool-calling support.
+// To revert to simple completion (no tools), swap back to OpenAiService.
+builder.Services.AddSingleton<ILlmService, AgentService>();
 
 // ── Tools ─────────────────────────────────────────────────────────────────────
 builder.Services.AddSingleton<HelloTool>();

@@ -11,6 +11,18 @@ public sealed class HelloTool : ITool
     public string Name        => "hello";
     public string Description => "Greets a person by name";
 
+    public string InputSchema => """
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The name of the person to greet"
+            }
+          }
+        }
+        """;
+
     public Task<string> ExecuteAsync(string input)
     {
         var name = string.IsNullOrWhiteSpace(input) ? "World" : input.Trim();
