@@ -1,4 +1,5 @@
 using GoogleChatBot.Commands;
+using Infrastructure.OpenAi;
 using Tools;
 using Tools.Abstractions;
 
@@ -6,10 +7,15 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
-// ── Tools ─────────────────────────────────────────────────────────────────────
-// Register each tool as its concrete type first (for injection into commands),
-// then forward as ITool (for ToolRegistry).
+// ── LLM ───────────────────────────────────────────────────────────────────────
+// API key: dotnet user-secrets set "OpenAi:ApiKey" "sk-..."
+// Or set environment variable: OpenAi__ApiKey=sk-...
+builder.Services.Configure<OpenAiOptions>(
+    builder.Configuration.GetSection(OpenAiOptions.SectionName));
 
+builder.Services.AddSingleton<ILlmService, OpenAiService>();
+
+// ── Tools ─────────────────────────────────────────────────────────────────────
 builder.Services.AddSingleton<HelloTool>();
 builder.Services.AddSingleton<TimeTool>();
 
@@ -19,10 +25,6 @@ builder.Services.AddSingleton<ITool>(sp => sp.GetRequiredService<TimeTool>());
 builder.Services.AddSingleton<ToolRegistry>();
 
 // ── Commands ──────────────────────────────────────────────────────────────────
-// Commands are registered as concrete types (for HelpCommand's peer list),
-// then forwarded as ICommand (for CommandDispatcher).
-// HelpCommand avoids circular DI by receiving an explicit peer list.
-
 builder.Services.AddSingleton<HelloCommand>(sp =>
     new HelloCommand(sp.GetRequiredService<HelloTool>()));
 
