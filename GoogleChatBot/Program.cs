@@ -2,6 +2,7 @@ using Domain.Repositories;
 using Domain.Workflow;
 using GoogleChatBot.Commands;
 using GoogleChatBot.Controllers;
+using GoogleChatBot.Handlers;
 using Infrastructure.OpenAi;
 using Infrastructure.Repositories;
 using Tools;
@@ -82,6 +83,9 @@ builder.Services.AddSingleton<CommandDispatcher>();
 
 // ── Stage 8: Card action handler ──────────────────────────────────────────────
 builder.Services.AddSingleton<ActionController>();
+
+// ── Event handler ─────────────────────────────────────────────────────────────
+builder.Services.AddSingleton<IChatEventHandler, ChatEventHandler>();
 
 // ─────────────────────────────────────────────────────────────────────────────
 
