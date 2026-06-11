@@ -16,249 +16,158 @@ Projects:
 
 ---
 
-## Task A — Create IMPLEMENTATION_PLAN.md
+## Task A — Create IMPLEMENTATION_PLAN.md ✅ DONE
 
-Create `IMPLEMENTATION_PLAN.md` at the **root** of the repository containing the full 13-stage design document (see Stage Reference section below).
-
----
-
-## Task B — Domain Models
-
-Delete placeholder `Domain/Class1.cs`.
-
-Create:
-
-### `Domain/Tickets/TicketState.cs`
-```csharp
-namespace Domain.Tickets;
-
-public enum TicketState
-{
-    New = 0,
-    Analyzing = 1,
-    Analyzed = 2,
-    Fixing = 3,
-    Fixed = 4,
-    Failed = 5,
-    Closed = 6
-}
-```
-
-### `Domain/Tickets/ErrorTicket.cs`
-```csharp
-namespace Domain.Tickets;
-
-public sealed class ErrorTicket
-{
-    public Guid Id { get; init; } = Guid.NewGuid();
-    public string Title { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
-    public string Source { get; set; } = string.Empty;     // "GoogleSheets" | "GoogleDrive"
-    public string? SourceFileId { get; set; }              // Google Drive file ID
-    public string? SourceRange { get; set; }               // Sheets range, e.g. "Sheet1!A2:E2"
-    public string? SpaceName { get; set; }                 // Google Chat space name
-    public string? MessageName { get; set; }               // Google Chat message for reply threading
-    public TicketState State { get; set; } = TicketState.New;
-    public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
-    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
-    public string? AnalysisResult { get; set; }
-    public string? BranchName { get; set; }
-    public string? PullRequestUrl { get; set; }
-}
-```
+`IMPLEMENTATION_PLAN.md` created at the repository root.
 
 ---
 
-## Task C — Stage 1: Base Google Chat Bot
+## Task B — Domain Models ✅ DONE
 
-### Goal
-Accept Google Chat webhook, parse the message, return a plain-text echo/greeting.
+`Domain/Class1.cs` deleted.
 
-### GoogleChatBot project changes
+`Domain/Tickets/TicketState.cs` — enum: `New=0, Analyzing=1, Analyzed=2, Fixing=3, Fixed=4, Failed=5, Closed=6`
 
-**Update `GoogleChatBot.csproj`** — add `Microsoft.AspNetCore.OpenApi` for Swagger (optional but useful):
-No extra packages needed for Stage 1; controllers are included in the Web SDK.
+`Domain/Tickets/ErrorTicket.cs` — aggregate with fields:
+`Id` (Guid), `Title`, `Description`, `Source`, `SourceFileId?`, `SourceRange?`, `SpaceName?`, `MessageName?`,
+`State` (TicketState), `CreatedAt`, `UpdatedAt`, `AnalysisResult?`, `BranchName?`, `PullRequestUrl?`
 
-**Update `Program.cs`**:
-```csharp
-var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddControllers();
-var app = builder.Build();
-app.MapControllers();
-app.Run();
-```
+---
 
-**Create `GoogleChatBot/Models/Incoming/ChatEvent.cs`**:
-```csharp
-namespace GoogleChatBot.Models.Incoming;
+## Task C — Stage 1–6 ✅ DONE
 
-public sealed class ChatEvent
-{
-    public string Type { get; set; } = string.Empty;   // "MESSAGE" | "ADDED_TO_SPACE" | "REMOVED_FROM_SPACE"
-    public ChatMessage? Message { get; set; }
-    public ChatSpace? Space { get; set; }
-}
-```
-
-**Create `GoogleChatBot/Models/Incoming/ChatMessage.cs`**:
-```csharp
-namespace GoogleChatBot.Models.Incoming;
-
-public sealed class ChatMessage
-{
-    public string Name { get; set; } = string.Empty;
-    public string Text { get; set; } = string.Empty;
-    public ChatSender? Sender { get; set; }
-}
-```
-
-**Create `GoogleChatBot/Models/Incoming/ChatSender.cs`**:
-```csharp
-namespace GoogleChatBot.Models.Incoming;
-
-public sealed class ChatSender
-{
-    public string Name { get; set; } = string.Empty;
-    public string DisplayName { get; set; } = string.Empty;
-}
-```
-
-**Create `GoogleChatBot/Models/Incoming/ChatSpace.cs`**:
-```csharp
-namespace GoogleChatBot.Models.Incoming;
-
-public sealed class ChatSpace
-{
-    public string Name { get; set; } = string.Empty;
-    public string Type { get; set; } = string.Empty;   // "DM" | "ROOM"
-}
-```
-
-**Create `GoogleChatBot/Models/Outgoing/ChatResponse.cs`**:
-```csharp
-namespace GoogleChatBot.Models.Outgoing;
-
-public sealed class ChatResponse
-{
-    public string Text { get; set; } = string.Empty;
-
-    public static ChatResponse From(string text) => new() { Text = text };
-}
-```
-
-**Create `GoogleChatBot/Controllers/ChatController.cs`**:
-```csharp
-using GoogleChatBot.Models.Incoming;
-using GoogleChatBot.Models.Outgoing;
-using Microsoft.AspNetCore.Mvc;
-
-namespace GoogleChatBot.Controllers;
-
-[ApiController]
-[Route("chat")]
-public sealed class ChatController : ControllerBase
-{
-    private readonly ILogger<ChatController> _logger;
-
-    public ChatController(ILogger<ChatController> logger)
-    {
-        _logger = logger;
-    }
-
-    [HttpPost]
-    public IActionResult HandleEvent([FromBody] ChatEvent chatEvent)
-    {
-        _logger.LogInformation("Received event type={Type} from space={Space}",
-            chatEvent.Type, chatEvent.Space?.Name);
-
-        return chatEvent.Type switch
-        {
-            "ADDED_TO_SPACE" => Ok(ChatResponse.From("Hello! I'm your AI assistant. Type /help to see what I can do.")),
-            "MESSAGE"        => Ok(HandleMessage(chatEvent)),
-            _                => Ok(new { })
-        };
-    }
-
-    private static ChatResponse HandleMessage(ChatEvent chatEvent)
-    {
-        var text = chatEvent.Message?.Text?.Trim() ?? string.Empty;
-        var sender = chatEvent.Message?.Sender?.DisplayName ?? "Unknown";
-
-        return ChatResponse.From($"Hi {sender}! You said: \"{text}\"");
-    }
-}
-```
-
-### Result
-- `POST /chat` accepts Google Chat webhook JSON
-- Responds with `{ "text": "..." }` for MESSAGE and ADDED_TO_SPACE events
-- REMOVED_FROM_SPACE returns empty JSON `{}`
+All changes are described in the **Stage Reference** section below.
 
 ---
 
 ## Stage Reference — All 13 Stages
 
-### Stage 1 — Base Bot (Google Chat Webhook)
+### Stage 1 — Base Bot (Google Chat Webhook) ✅ DONE
 **Goal:** Receive messages, return plain text.
-**Implements:** ChatController, ChatEvent/Message/Sender/Space DTOs, ChatResponse.
-**Result:** Working webhook endpoint, verifiable via curl or ngrok.
+**Files:**
+- `GoogleChatBot/Controllers/ChatController.cs` — `[ApiController] [Route("chat")]`, `POST /chat`
+- `GoogleChatBot/Models/Incoming/ChatEvent.cs` — `Type`, `Message`, `Space`, `Action`
+- `GoogleChatBot/Models/Incoming/ChatMessage.cs` — `Name`, `Text`, `Sender`
+- `GoogleChatBot/Models/Incoming/ChatSender.cs` — `Name`, `DisplayName`
+- `GoogleChatBot/Models/Incoming/ChatSpace.cs` — `Name`, `Type` (`"DM"` | `"ROOM"`)
+- `GoogleChatBot/Models/Incoming/ChatAction.cs` — `ActionMethodName`, `Parameters` *(added alongside Stage 2)*
+- `GoogleChatBot/Models/Incoming/ChatActionParameter.cs` — `Key`, `Value`
+- `GoogleChatBot/Models/Outgoing/ChatResponse.cs` — `{ Text }` + `static From(string)`
+
+All DTOs use `[JsonPropertyName]` for snake_case ↔ PascalCase mapping.
+
+**Dispatch on `chatEvent.Type`:**
+| Type | Action |
+|---|---|
+| `ADDED_TO_SPACE` | `ChatResponse.From("Hello! I'm your AI assistant…")` |
+| `MESSAGE` | `CommandDispatcher` → on `null` result falls back to LLM |
+| `CARD_CLICKED` | Placeholder (logs `ActionMethodName`) |
+| anything else | `Ok(new { })` |
+
+**Result:** Working `POST /chat` webhook, verifiable via curl or ngrok.
 
 ---
 
-### Stage 2 — Command System
-**Goal:** Parse and dispatch user commands like `/help`, `/status`, `/ticket`.
-**Classes:**
-- `GoogleChatBot/Commands/ICommand.cs` — `Task<ChatResponse> ExecuteAsync(ChatEvent)`
-- `GoogleChatBot/Commands/HelpCommand.cs`
-- `GoogleChatBot/Commands/StatusCommand.cs`
-- `GoogleChatBot/Commands/CommandDispatcher.cs` — parses prefix, routes to ICommand
-**Result:** Extensible command routing injected into ChatController.
+### Stage 2 — Command System ✅ DONE
+**Goal:** Parse and dispatch user commands like `/help`, `/hello`, `/time`.
+**Files:**
+- `GoogleChatBot/Commands/ICommand.cs`
+  ```csharp
+  string Name { get; }
+  string Description { get; }
+  bool CanHandle(string input);
+  Task<string> ExecuteAsync(string input);   // string-in / string-out
+  ```
+- `GoogleChatBot/Commands/HelloCommand.cs` — `/hello [name]`, delegates to `HelloTool`
+- `GoogleChatBot/Commands/TimeCommand.cs` — `/time`, delegates to `TimeTool`
+- `GoogleChatBot/Commands/HelpCommand.cs` — `/help`, accepts `IReadOnlyList<ICommand>`, prepends itself at render time to avoid a circular dependency
+- `GoogleChatBot/Commands/CommandDispatcher.cs` — accepts `IEnumerable<ICommand>`; returns `null` if input does not start with `/`, otherwise finds a matching `CanHandle` or returns an "Unknown command" message
+
+**Deviation from plan:** `ICommand.ExecuteAsync` accepts `string` instead of `ChatEvent` and returns `string` instead of `ChatResponse` — simplified to work with raw text.
+
+**Commands not implemented from plan:** `StatusCommand`, `TicketCommand` — deferred.
+
+**Result:** Extensible command routing injected into `ChatController`.
 
 ---
 
-### Stage 3 — Tool Architecture
+### Stage 3 — Tool Architecture ✅ DONE
 **Goal:** Define tool abstractions in the `Tools` project.
-**Classes:**
-- `Tools/Abstractions/ITool.cs` — `string Name`, `string Description`, `Task<string> ExecuteAsync(string input)`
-- `Tools/Abstractions/IMcpTool.cs` — extends ITool with JSON schema
-- `Tools/HelloTool.cs` — returns greeting
-- `Tools/TimeTool.cs` — returns current UTC time
-- `Tools/ToolRegistry.cs` — `IReadOnlyList<ITool> GetAll()`
-**Result:** Tools project has working, testable tools.
+**Files:**
+- `Tools/Abstractions/ITool.cs`
+  ```csharp
+  string Name { get; }
+  string Description { get; }
+  string InputSchema { get; }   // raw JSON Schema string
+  Task<string> ExecuteAsync(string input);
+  ```
+- `Tools/HelloTool.cs` — `name="hello"`, input → `"Hello, *{name}*!"`
+- `Tools/TimeTool.cs` — `name="time"`, returns `DateTimeOffset.UtcNow` formatted as `yyyy-MM-dd HH:mm:ss UTC`
+- `Tools/ToolRegistry.cs` — `ToolRegistry(IEnumerable<ITool>)`, `GetAll()`, `Find(name)` (case-insensitive)
+
+**Deviation from plan:** A separate `IMcpTool` was not created — `InputSchema` is embedded directly in `ITool`. A single interface serves all consumers (commands, LLM, MCP).
+
+**Result:** Tools project has working, testable tools with JSON Schema support.
 
 ---
 
-### Stage 4 — LLM Integration
+### Stage 4 — LLM Integration ✅ DONE
 **Goal:** Call OpenAI Chat Completions from Infrastructure.
-**Packages:** `Azure.AI.OpenAI` or `OpenAI` NuGet (official SDK)
-**Classes:**
-- `Infrastructure/OpenAi/ILlmService.cs` — `Task<string> CompleteAsync(IList<ChatMessage> messages)`
-- `Infrastructure/OpenAi/OpenAiService.cs` — implements ILlmService
-- `Infrastructure/OpenAi/OpenAiOptions.cs` — ApiKey, Model, MaxTokens
-**Result:** GoogleChatBot can call LLM and return AI-generated text.
+**Package:** `OpenAI 2.2.0` (official SDK)
+**Files:**
+- `Infrastructure/OpenAi/ILlmService.cs`
+  ```csharp
+  Task<string> CompleteAsync(string userMessage);
+  ```
+- `Infrastructure/OpenAi/OpenAiService.cs` — `ILlmService`, simple single-turn completion: `[system, user] → text`. **Exists as a fallback**, not registered in `GoogleChatBot`.
+- `Infrastructure/OpenAi/OpenAiOptions.cs` — config section `"OpenAi"`:
+  `ApiKey`, `Model` (default `"gpt-4o-mini"`), `MaxTokens` (1024), `SystemPrompt`
+- Secret stored via `dotnet user-secrets set "OpenAi:ApiKey" "sk-..."`
+
+**Deviation from plan:** `ILlmService.CompleteAsync` accepts `string` instead of `IList<LlmMessage>` — the system prompt lives in `OpenAiOptions`, not in the call site. `LlmMessage.cs` was not created.
+
+**Result:** Infrastructure can call OpenAI; the active service is replaced in Stage 5.
 
 ---
 
-### Stage 5 — LLM + Tools (Function Calling)
+### Stage 5 — LLM + Tools (Function Calling) ✅ DONE
 **Goal:** Wire tools into the OpenAI function-calling loop.
-**Classes:**
-- `Infrastructure/OpenAi/ToolFunctionMapper.cs` — converts IMcpTool → OpenAI function definition
-- `Infrastructure/OpenAi/AgentLoop.cs` — iterates tool calls until final answer
-**Result:** Bot can answer "What time is it?" by calling TimeTool via LLM function calling.
+**Files:**
+- `Infrastructure/OpenAi/AgentService.cs` — implements `ILlmService`, **active** service registered in `GoogleChatBot`
+
+**`AgentService.CompleteAsync` algorithm:**
+1. Builds `[SystemChatMessage, UserChatMessage]`
+2. Reads all tools from `ToolRegistry`, creates `ChatTool.CreateFunctionTool(name, description, BinaryData(inputSchema))` for each
+3. Runs the loop (max `MaxIterations = 5`):
+   - `Stop` → return text
+   - `ToolCalls` → for each call: `Find(name)` → `ExtractFirstStringArg(json)` → `ExecuteAsync` → append `ToolChatMessage` → next iteration
+   - otherwise → return text or fallback string
+4. `ExtractFirstStringArg` — parses the JSON object and returns the value of the first string property (or `""` for empty objects)
+
+**DI registration (`GoogleChatBot/Program.cs`):**
+```csharp
+builder.Services.AddSingleton<ILlmService, AgentService>();  // Stage 5 active
+```
+
+**Deviation from plan:** `ToolFunctionMapper.cs` and `AgentLoop.cs` as separate files were not created — the entire agent loop is consolidated in `AgentService.cs`.
+
+**Result:** Bot answers "What time is it?" by calling `TimeTool` via LLM function calling.
 
 ---
 
-### Stage 6 — MCP Server
+### Stage 6 — MCP Server ✅ DONE
 **Goal:** Expose tools via Model Context Protocol HTTP API.
-**Endpoint contract:**
-- `POST /mcp/tools/list` → `{ tools: [ { name, description, inputSchema } ] }`
-- `POST /mcp/tools/call` → `{ toolName, input }` → `{ result }`
-**Classes:**
-- `McpServer/Controllers/McpController.cs`
-- `McpServer/Models/ToolListResponse.cs`
-- `McpServer/Models/ToolCallRequest.cs`
-- `McpServer/Models/ToolCallResponse.cs`
-**Result:** McpServer is a standalone HTTP MCP endpoint.
+**Endpoint contract (implemented):**
+- `GET  /mcp/tools`      → `{ tools: [ { name, description, inputSchema } ] }`
+- `POST /mcp/tools/call` → `{ toolName, input }` → `{ result }` / 404 `{ error }`
+**Swagger UI:** served at `/` (root) → `http://localhost:5295/`
+**Package:** `Swashbuckle.AspNetCore 10.2.1`
+**Files created:**
+- `McpServer/McpServer.csproj` — refs `Tools.csproj`, `Swashbuckle.AspNetCore`, XML doc enabled
+- `McpServer/Program.cs` — controllers + tool DI + Swagger + SwaggerUI at root
+- `McpServer/Controllers/McpController.cs` — `ListTools` + `CallTool` actions
+- `McpServer/Models/McpDtos.cs` — `ToolInfo`, `ToolListResponse`, `ToolCallRequest`, `ToolCallResponse`
+**Result:** McpServer is a standalone HTTP MCP endpoint with interactive Swagger UI.
 
 ---
 
@@ -355,14 +264,19 @@ Worker        → Domain, Infrastructure
 
 ## Immediate Implementation Steps
 
-1. **Create `IMPLEMENTATION_PLAN.md`** at repo root (full stage reference)
-2. **Delete `Domain/Class1.cs`**
-3. **Create `Domain/Tickets/TicketState.cs`**
-4. **Create `Domain/Tickets/ErrorTicket.cs`**
-5. **Update `GoogleChatBot/Program.cs`** (add controllers)
-6. **Create `GoogleChatBot/Models/Incoming/ChatEvent.cs`**
-7. **Create `GoogleChatBot/Models/Incoming/ChatMessage.cs`**
-8. **Create `GoogleChatBot/Models/Incoming/ChatSender.cs`**
-9. **Create `GoogleChatBot/Models/Incoming/ChatSpace.cs`**
-10. **Create `GoogleChatBot/Models/Outgoing/ChatResponse.cs`**
-11. **Create `GoogleChatBot/Controllers/ChatController.cs`**
+### ✅ Completed (Stages 1–6)
+1. `Domain/Tickets/TicketState.cs` — enum
+2. `Domain/Tickets/ErrorTicket.cs` — aggregate
+3. `GoogleChatBot/Program.cs` — controllers, tools, commands, LLM DI
+4. `GoogleChatBot/Models/Incoming/` — `ChatEvent`, `ChatMessage`, `ChatSender`, `ChatSpace`, `ChatAction`, `ChatActionParameter`
+5. `GoogleChatBot/Models/Outgoing/ChatResponse.cs`
+6. `GoogleChatBot/Controllers/ChatController.cs` — webhook with command + LLM dispatch
+7. `GoogleChatBot/Commands/` — `ICommand`, `HelloCommand`, `TimeCommand`, `HelpCommand`, `CommandDispatcher`
+8. `Tools/Abstractions/ITool.cs`
+9. `Tools/HelloTool.cs`, `Tools/TimeTool.cs`, `Tools/ToolRegistry.cs`
+10. `Infrastructure/OpenAi/ILlmService.cs`, `OpenAiOptions.cs`, `OpenAiService.cs`, `AgentService.cs`
+11. `McpServer/Controllers/McpController.cs` — `GET /mcp/tools`, `POST /mcp/tools/call`
+12. `McpServer/Models/McpDtos.cs` — `ToolInfo`, `ToolListResponse`, `ToolCallRequest`, `ToolCallResponse`
+13. `McpServer/Program.cs` — controllers, tools, Swagger UI at `/`
+
+### 🔜 Next: Stage 7 — Workflow + State Machine

@@ -6,6 +6,7 @@ namespace McpServer.Controllers;
 
 [ApiController]
 [Route("mcp")]
+[Produces("application/json")]
 public sealed class McpController : ControllerBase
 {
     private readonly ToolRegistry _registry;
@@ -15,9 +16,10 @@ public sealed class McpController : ControllerBase
         _registry = registry;
     }
 
+    /// <summary>Returns metadata for all registered tools.</summary>
     // GET /mcp/tools
-    // Returns the list of all registered tools with their metadata.
     [HttpGet("tools")]
+    [ProducesResponseType<ToolListResponse>(StatusCodes.Status200OK)]
     public ActionResult<ToolListResponse> ListTools()
     {
         var tools = _registry.GetAll()
@@ -27,10 +29,11 @@ public sealed class McpController : ControllerBase
         return Ok(new ToolListResponse(tools));
     }
 
+    /// <summary>Calls a tool by name and returns its result.</summary>
     // POST /mcp/tools/call
-    // Body: { "toolName": "hello", "input": "Alice" }
-    // Calls the named tool and returns its result.
     [HttpPost("tools/call")]
+    [ProducesResponseType<ToolCallResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ToolCallResponse>> CallTool([FromBody] ToolCallRequest request)
     {
         var tool = _registry.Find(request.ToolName);
