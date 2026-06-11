@@ -1,3 +1,5 @@
+using GoogleChatBot.Models.Outgoing;
+
 namespace GoogleChatBot.Commands;
 
 /// <summary>
@@ -19,8 +21,9 @@ public interface ICommand
     bool CanHandle(string input);
 
     /// <summary>
-    /// Executes the command and returns the text to send back to the user.
+    /// Executes the command and returns a <see cref="BotResponse"/> —
+    /// either plain text or a rich card.
     /// Async because commands delegate to Tools, which may perform I/O.
     /// </summary>
-    Task<string> ExecuteAsync(string input);
+    Task<BotResponse> ExecuteAsync(string input);
 }

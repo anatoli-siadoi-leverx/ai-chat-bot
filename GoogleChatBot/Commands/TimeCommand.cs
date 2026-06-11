@@ -1,3 +1,4 @@
+using GoogleChatBot.Models.Outgoing;
 using Tools;
 
 namespace GoogleChatBot.Commands;
@@ -21,5 +22,6 @@ public sealed class TimeCommand : ICommand
         input.Equals("/time", StringComparison.OrdinalIgnoreCase) ||
         input.StartsWith("/time ", StringComparison.OrdinalIgnoreCase);
 
-    public Task<string> ExecuteAsync(string input) => _tool.ExecuteAsync(input);
+    public async Task<BotResponse> ExecuteAsync(string input)
+        => BotResponse.FromText(await _tool.ExecuteAsync(input));
 }

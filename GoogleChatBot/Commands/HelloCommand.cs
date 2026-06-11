@@ -1,3 +1,4 @@
+using GoogleChatBot.Models.Outgoing;
 using Tools;
 
 namespace GoogleChatBot.Commands;
@@ -22,12 +23,12 @@ public sealed class HelloCommand : ICommand
         input.Equals("/hello", StringComparison.OrdinalIgnoreCase) ||
         input.StartsWith("/hello ", StringComparison.OrdinalIgnoreCase);
 
-    public Task<string> ExecuteAsync(string input)
+    public async Task<BotResponse> ExecuteAsync(string input)
     {
         // Split "/hello John Doe" → ["hello", "John Doe"], pass "John Doe" to tool.
         var parts = input.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
         var name  = parts.Length > 1 ? parts[1].Trim() : string.Empty;
 
-        return _tool.ExecuteAsync(name);
+        return BotResponse.FromText(await _tool.ExecuteAsync(name));
     }
 }

@@ -1,3 +1,5 @@
+using GoogleChatBot.Models.Outgoing;
+
 namespace GoogleChatBot.Commands;
 
 /// <summary>
@@ -19,7 +21,7 @@ public sealed class HelpCommand : ICommand
         input.Equals("/help", StringComparison.OrdinalIgnoreCase) ||
         input.StartsWith("/help ", StringComparison.OrdinalIgnoreCase);
 
-    public Task<string> ExecuteAsync(string input)
+    public Task<BotResponse> ExecuteAsync(string input)
     {
         // Prepend(this) so /help also lists itself in the output.
         var lines = _commands
@@ -27,6 +29,7 @@ public sealed class HelpCommand : ICommand
             .OrderBy(c => c.Name)
             .Select(c => $"• `/{c.Name}` — {c.Description}");
 
-        return Task.FromResult("*Available commands:*\n" + string.Join("\n", lines));
+        return Task.FromResult(
+            BotResponse.FromText("*Available commands:*\n" + string.Join("\n", lines)));
     }
 }

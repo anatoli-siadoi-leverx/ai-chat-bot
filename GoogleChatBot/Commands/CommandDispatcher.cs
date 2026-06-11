@@ -1,3 +1,5 @@
+using GoogleChatBot.Models.Outgoing;
+
 namespace GoogleChatBot.Commands;
 
 /// <summary>
@@ -20,10 +22,10 @@ public sealed class CommandDispatcher
     /// Tries to dispatch <paramref name="input"/> to a registered command.
     /// </summary>
     /// <returns>
-    /// The command's response text, an "unknown command" message,
+    /// The command's <see cref="BotResponse"/>, an "unknown command" text response,
     /// or <c>null</c> when the input does not start with <c>/</c>.
     /// </returns>
-    public async Task<string?> DispatchAsync(string input)
+    public async Task<BotResponse?> DispatchAsync(string input)
     {
         if (string.IsNullOrWhiteSpace(input) || input[0] != '/')
             return null;
@@ -34,7 +36,8 @@ public sealed class CommandDispatcher
         {
             var name = input.Split(' ')[0];
             _logger.LogWarning("Unknown command: {Command}", name);
-            return $"Unknown command: `{name}`. Type `/help` to see available commands.";
+            return BotResponse.FromText(
+                $"Unknown command: `{name}`. Type `/help` to see available commands.");
         }
 
         _logger.LogInformation("Dispatching command /{Command}", command.Name);
