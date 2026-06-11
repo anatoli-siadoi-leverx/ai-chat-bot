@@ -95,7 +95,7 @@ app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
     options.SwaggerEndpoint("/swagger/v1/swagger.json", "Google Chat Bot v1");
-    options.RoutePrefix = "swagger";   // Swagger UI at: http://localhost:<port>/swagger
+    options.RoutePrefix = string.Empty;
 });
 
 app.MapControllers();

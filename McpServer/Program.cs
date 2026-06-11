@@ -39,7 +39,7 @@ app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
     options.SwaggerEndpoint("/swagger/v1/swagger.json", "MCP Server v1");
-    options.RoutePrefix = string.Empty;   // Swagger UI at root: http://localhost:5295/
+    options.RoutePrefix = string.Empty;
 });
 
 app.MapControllers();
