@@ -25,6 +25,9 @@ public sealed class ErrorTicket
     /// <summary>Google Chat message name for reply threading ("spaces/xxx/messages/yyy").</summary>
     public string? MessageName { get; set; }
 
+    /// <summary>Google Chat thread name for all subsequent replies ("spaces/xxx/threads/zzz").</summary>
+    public string? ThreadName { get; set; }
+
     public TicketState State { get; set; } = TicketState.New;
 
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;

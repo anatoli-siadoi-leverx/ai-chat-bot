@@ -3,8 +3,9 @@ using Domain.Workflow;
 using GoogleChatBot.Commands;
 using GoogleChatBot.Controllers;
 using GoogleChatBot.Handlers;
+using Infrastructure.Google;
 using Infrastructure.OpenAi;
-using Infrastructure.Repositories;
+using Infrastructure.Persistence;
 using Tools;
 using Tools.Abstractions;
 
@@ -47,9 +48,16 @@ builder.Services.AddSingleton<ITool>(sp => sp.GetRequiredService<TimeTool>());
 
 builder.Services.AddSingleton<ToolRegistry>();
 
-// ── Stage 7: Ticket Repository + Workflow ────────────────────────────────────
-builder.Services.AddSingleton<ITicketRepository, InMemoryTicketRepository>();
+// ── Stage 9b: Ticket Repository (SQLite — shared with Worker) ────────────────
+var ticketsConn = builder.Configuration.GetConnectionString("Tickets")
+    ?? "Data Source=tickets.db";
+builder.Services.AddSqliteTickets(ticketsConn);
 builder.Services.AddSingleton<TicketWorkflow>();
+
+// ── Google Chat API (thread replies from ActionController) ───────────────────
+builder.Services.Configure<GoogleCredentialOptions>(
+    builder.Configuration.GetSection(GoogleCredentialOptions.SectionName));
+builder.Services.AddSingleton<IGoogleChatApiService, GoogleChatApiService>();
 
 // ── Commands ──────────────────────────────────────────────────────────────────
 builder.Services.AddSingleton<HelloCommand>(sp =>
@@ -90,6 +98,9 @@ builder.Services.AddSingleton<IChatEventHandler, ChatEventHandler>();
 // ─────────────────────────────────────────────────────────────────────────────
 
 var app = builder.Build();
+
+// Ensure SQLite schema exists and WAL mode is on
+app.Services.EnsureDatabase();
 
 app.UseSwagger();
 app.UseSwaggerUI(options =>

@@ -287,48 +287,131 @@ Bot sends cards with ticket info + Analyze / Fix / Close buttons derived from `T
 
 ---
 
-## Stage 9 — Worker (Polling)
+## Stage 9b — Persistent Ticket Repository (SQLite)
 
-**Goal:** Every 5 minutes, scan error sources and create `ErrorTickets`.
+**Goal:** Replace the per-process `InMemoryTicketRepository` with a shared SQLite database so that
+tickets created by the Worker are visible to the GoogleChatBot when processing button clicks.
 
-### Classes
+### Problem
+`Worker` and `GoogleChatBot` are separate OS processes. Each had its own
+`InMemoryTicketRepository` instance, so a ticket created by the Worker was invisible to the
+GoogleChatBot when the user clicked the **Analyze** button.
+
+### Solution
+Both processes connect to the same SQLite file via EF Core. SQLite WAL mode is enabled so
+concurrent reads (GoogleChatBot) and writes (Worker) don't block each other.
+
+### Files
 | File | Purpose |
 |---|---|
-| `Worker/ErrorPollingWorker.cs` | Replaces default `Worker.cs`; runs every 5 min |
-| `Worker/IErrorSource.cs` | `Task<IList<ErrorTicket>> FetchNewErrorsAsync(CancellationToken)` |
-| `Worker/StubErrorSource.cs` | Returns deterministic fake errors for testing |
+| `Infrastructure/Persistence/AppDbContext.cs` | EF Core `DbContext` with `DbSet<ErrorTicket>` |
+| `Infrastructure/Persistence/SqliteTicketRepository.cs` | `ITicketRepository` backed by `IDbContextFactory<AppDbContext>` |
+| `Infrastructure/Persistence/PersistenceExtensions.cs` | `AddSqliteTickets(connectionString)` + `EnsureDatabase()` helpers |
+
+**NuGet:** `Microsoft.EntityFrameworkCore.Sqlite` (added to `Infrastructure`)
+
+### Configuration (both processes)
+```json
+"ConnectionStrings": {
+  "Tickets": "Data Source=C:\\path\\to\\shared\\tickets.db"
+}
+```
+Set the same absolute path in `Worker/appsettings.json` and `GoogleChatBot/appsettings.json`.
+In development, use user-secrets or `appsettings.Development.json` for the real path.
 
 ### Result
-Worker automatically creates tickets and posts notifications to Google Chat.
+Tickets survive across process boundaries — clicking **Analyze** in Chat correctly finds the
+ticket created by the Drive Watcher.
 
 ---
 
-## Stage 10 — Google Drive / Sheets Integration
+## Stage 9 — Google Drive Watcher + Chat Notification
 
-**Goal:** Read real error data from a Google Sheets spreadsheet.
+**Goal:** Watch a Google Drive folder's `New/` subfolder; on new file — create a ticket, notify Chat, move file to `InProcess/`.
 
-**NuGet:** `Google.Apis.Sheets.v4`, `Google.Apis.Drive.v3`
+### Drive Folder Structure
+```
+<RootFolder>/
+  New/        ← worker polls here
+  InProcess/  ← file moved here immediately after notification
+  Done/       ← file moved here after ticket is closed
+```
 
-### Classes
+### Full Trigger Flow
+1. Worker polls `New/` on a configurable interval
+2. For each new file:
+   - Read file content (text extraction — see Stage 10)
+   - Generate a one-sentence description via LLM
+   - Create `ErrorTicket` (`Source="GoogleDrive"`, `SourceFileId`, `State=New`)
+   - Call Google Chat REST API → post **card message** to the space:
+     title = filename, subtitle = short description, button = **Analyze**
+   - Call Google Chat REST API → post **thread reply** with full file content
+   - Save `MessageName` + `ThreadName` on the ticket
+   - Move file from `New/` to `InProcess/`
+3. Ticket stays `New` until the user clicks **Analyze**
+
+### Domain Change
+| Field | Type | Purpose |
+|---|---|---|
+| `ErrorTicket.ThreadName` | `string?` | Google Chat thread (`spaces/xxx/threads/zzz`) for all future replies |
+
+### Files
 | File | Purpose |
 |---|---|
-| `Infrastructure/Google/GoogleSheetsErrorSource.cs` | Implements `IErrorSource`; reads rows from configured sheet |
-| `Infrastructure/Google/GoogleSheetsService.cs` | Low-level read/write wrapper |
-| `Infrastructure/Google/GoogleDriveService.cs` | File metadata, change detection |
-| `Infrastructure/Google/GoogleCredentialOptions.cs` | `ServiceAccountJson`, `SpreadsheetId`, `SheetRange` |
+| `Worker/GoogleDriveWatcherWorker.cs` | Replaces default `Worker.cs`; polls on interval |
+| `Infrastructure/Google/GoogleDriveService.cs` | List files in folder, read text, move file between folders |
+| `Infrastructure/Google/IGoogleDriveService.cs` | Interface for Drive operations |
+| `Infrastructure/Google/IGoogleChatApiService.cs` | Interface: proactive post message + thread reply |
+| `Infrastructure/Google/GoogleChatApiService.cs` | Calls Google Chat REST API with service-account auth |
+| `Infrastructure/Google/GoogleCredentialOptions.cs` | `ServiceAccountJson`, folder IDs, `ChatSpaceName`, polling interval |
+
+**NuGet:** `Google.Apis.Drive.v3` (brings `Google.Apis.Auth` transitively)
 
 ### Result
-Worker uses a real Google Sheets file as error source.
+When a file is dropped in `New/`, the team sees a Chat card with description + Analyze button; file automatically moves to `InProcess/`.
 
 ---
 
-## Stage 11 — Code Access (Repo Tools)
+## Stage 10 — Google Drive File Reading
 
-**Goal:** Read source files from GitHub so the LLM can analyse code.
+**Goal:** Extract readable text from files stored in Google Drive (Google Docs, plain text, images).
 
-**NuGet:** `Octokit`
+### Supported Formats
+| MIME type | Strategy |
+|---|---|
+| `text/plain` | Direct download via Drive export |
+| `application/vnd.google-apps.document` | Export as `text/plain` |
+| `image/png` / `image/jpeg` | Download binary → OpenAI Vision API for text extraction |
 
-### Classes
+### Files
+| File | Purpose |
+|---|---|
+| `Infrastructure/Google/IDriveFileReader.cs` | Interface: `Task<string> ReadAsync(string fileId)` |
+| `Infrastructure/Google/DriveFileReader.cs` | Dispatches by MIME type; falls back to filename + "image attached" |
+
+### Result
+Worker receives a plain-text string regardless of file type and stores it in `ErrorTicket.Description` / thread content.
+
+---
+
+## Stage 11 — Repository Analysis
+
+**Goal:** On Analyze button click, AI reads the GitHub repository and posts its findings as a thread reply.
+
+### Trigger
+`CARD_CLICKED` → `actionMethodName = "analyze"` → `ActionController` → ticket `New → Analyzing`
+
+### Analysis Flow
+1. `ActionController` starts analysis for the ticket
+2. `AgentService` runs with GitHub tools in scope:
+   - `GitHubRepoTool` — reads file content by path
+   - `GitHubSearchTool` — code search for relevant symbols/patterns
+3. LLM produces an analysis report
+4. Report saved as `ErrorTicket.AnalysisResult`
+5. `GoogleChatApiService.PostThreadReplyAsync(threadName, report)` — posts report in bug thread
+6. Ticket transitions `Analyzing → Analyzed`; card updated with **Fix** button
+
+### Files
 | File | Purpose |
 |---|---|
 | `Tools/Git/GitHubRepoTool.cs` | `ITool`: reads file content by path and ref |
@@ -336,48 +419,59 @@ Worker uses a real Google Sheets file as error source.
 | `Infrastructure/GitHub/GitHubClientFactory.cs` | Creates authenticated `GitHubClient` |
 | `Infrastructure/GitHub/GitHubOptions.cs` | `Owner`, `Repo`, `Token` |
 
+**NuGet:** `Octokit`
+
 ### Result
-LLM can read source code files during analysis (fed into the `AgentService` loop).
+LLM analyses the codebase in context and posts findings directly in the bug-report thread.
 
 ---
 
 ## Stage 12 — Fix Pipeline (Branch / Commit / PR)
 
-**Goal:** Create branch, apply LLM-generated fix, open Pull Request automatically.
+**Goal:** On Fix button click, AI creates a branch, commits the generated patch, opens a PR, and posts the link in the thread.
 
-### Classes
+### Trigger
+`CARD_CLICKED` → `actionMethodName = "fix"` → ticket `Analyzed → Fixing`
+
+### Fix Flow
+1. `AgentService` runs with fix tools: reads files, generates patch, commits to new branch, opens PR
+2. `ErrorTicket.BranchName` + `ErrorTicket.PullRequestUrl` are saved
+3. `GoogleChatApiService.PostThreadReplyAsync(threadName, prLink)` — PR link posted in thread
+4. Ticket transitions `Fixing → Fixed`; card updated with **Close** button
+
+### Files
 | File | Purpose |
 |---|---|
 | `Tools/Git/CreateBranchTool.cs` | Creates a branch from a base ref |
 | `Tools/Git/CommitFileTool.cs` | Creates or updates a file on a branch |
-| `Tools/Git/CreatePullRequestTool.cs` | Opens a PR with title/body |
+| `Tools/Git/CreatePullRequestTool.cs` | Opens PR with title/body |
 | `Infrastructure/GitHub/GitHubService.cs` | Wraps Octokit for branch/commit/PR operations |
 
 ### Result
-Full automated fix pipeline: LLM writes the fix, tools apply it, PR is opened.
+Full automated fix pipeline; PR link visible in the bug-report thread.
 
 ---
 
 ## Stage 13 — Human-in-the-Loop
 
-**Goal:** Pause the pipeline at critical steps and wait for human approval.
+**Goal:** Before opening a PR, bot asks for human approval inside the thread; pipeline proceeds only on Approve.
 
-### Flow
-1. Bot sends card: "Ready to open PR for fix `#abc` — Approve / Reject"
-2. User clicks Approve
-3. `ActionController` receives `CARD_CLICKED`, resolves pending approval
-4. Pipeline resumes
+### Approval Flow
+1. Bot posts thread reply: "Ready to open PR — **Approve** / **Reject**" (card with two buttons)
+2. User clicks **Approve** → `CARD_CLICKED` → `ActionController` resolves the pending approval → PR is opened
+3. User clicks **Reject** → ticket transitions back to `Analyzed`; user can adjust and retry
+4. PR link posted in thread after approval
 
-### Classes
+### Files
 | File | Purpose |
 |---|---|
 | `Domain/Approvals/ApprovalRequest.cs` | `Id`, `TicketId`, `Description`, `State` |
 | `Domain/Approvals/ApprovalState.cs` | Enum: `Pending`, `Approved`, `Rejected` |
-| `Infrastructure/Approvals/InMemoryApprovalStore.cs` | `TaskCompletionSource` per request |
-| `GoogleChatBot/Controllers/ActionController.cs` | Handles button callbacks; resolves approval |
+| `Infrastructure/Approvals/InMemoryApprovalStore.cs` | `TaskCompletionSource<ApprovalState>` per request |
+| `GoogleChatBot/Controllers/ActionController.cs` | Extended to resolve approvals via button callback |
 
 ### Result
-Bot never opens a PR without explicit human approval.
+Bot never opens a PR without explicit human approval in the thread.
 
 ---
 
@@ -394,8 +488,9 @@ Bot never opens a PR without explicit human approval.
 | 6b | Swagger for GoogleChatBot | ✅ Done |
 | 7 | Workflow + State Machine | ✅ Done |
 | 8 | Google Chat Cards (Buttons) | ✅ Done |
-| 9 | Worker (Polling) | 🔜 Next |
-| 10 | Google Drive / Sheets Integration | ⬜ Planned |
-| 11 | Code Access (Repo Tools) | ⬜ Planned |
+| 9 | Google Drive Watcher + Chat Notification | ✅ Done |
+| 9b | Persistent Ticket Repository (SQLite) | ✅ Done |
+| 10 | Google Drive File Reading | ⬜ Planned |
+| 11 | Repository Analysis | ⬜ Planned |
 | 12 | Fix Pipeline (Branch / Commit / PR) | ⬜ Planned |
 | 13 | Human-in-the-Loop | ⬜ Planned |

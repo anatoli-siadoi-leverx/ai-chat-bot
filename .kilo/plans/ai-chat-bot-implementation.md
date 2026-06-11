@@ -190,6 +190,32 @@ Failed → New  (retry)
 
 ---
 
+### Stage 9b — Persistent Ticket Repository (SQLite)
+**Goal:** Replace per-process `InMemoryTicketRepository` with a shared SQLite file so tickets
+created by the Worker are visible to GoogleChatBot on button clicks.
+
+**Problem:** `Worker` and `GoogleChatBot` are separate OS processes. In-memory repositories are
+process-local, so `ActionController` could not find tickets created by the Drive Watcher.
+
+**Solution:** Both processes connect to the same SQLite file via EF Core.
+WAL mode is enabled for concurrent multi-process access (Worker writes, GoogleChatBot reads/updates).
+
+**Files:**
+- `Infrastructure/Persistence/AppDbContext.cs` — EF Core `DbContext` with `DbSet<ErrorTicket>`
+- `Infrastructure/Persistence/SqliteTicketRepository.cs` — implements `ITicketRepository` via `IDbContextFactory<AppDbContext>`
+- `Infrastructure/Persistence/PersistenceExtensions.cs` — `AddSqliteTickets()` + `EnsureDatabase()` shared helpers
+
+**Package:** `Microsoft.EntityFrameworkCore.Sqlite` → `Infrastructure.csproj`
+
+**Config (both processes):**
+```json
+"ConnectionStrings": { "Tickets": "Data Source=C:\\path\\to\\tickets.db" }
+```
+
+**Result:** Ticket state is shared across processes; Analyze button works end-to-end.
+
+---
+
 ### Stage 9 — Google Drive Watcher + Chat Notification
 **Goal:** Watch a Google Drive folder for new bug-report files; notify the team in Google Chat and move the file to InProcess.
 
