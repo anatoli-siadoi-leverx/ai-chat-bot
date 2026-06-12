@@ -39,12 +39,12 @@ public sealed class GoogleDriveService : IGoogleDriveService
     {
         var request = _drive.Files.List();
         request.Q = $"'{folderId}' in parents and trashed = false";
-        request.Fields = "files(id,name,mimeType)";
+        request.Fields = "files(id,name,mimeType,webViewLink,thumbnailLink)";
 
         var response = await request.ExecuteAsync(ct);
 
         return (response.Files ?? [])
-            .Select(f => new DriveFile(f.Id!, f.Name!, f.MimeType!))
+            .Select(f => new DriveFile(f.Id!, f.Name!, f.MimeType!, f.WebViewLink, f.ThumbnailLink))
             .ToList();
     }
 

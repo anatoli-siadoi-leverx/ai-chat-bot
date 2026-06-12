@@ -290,7 +290,7 @@ Bot sends cards with ticket info + Analyze / Fix / Close buttons derived from `T
 
 ---
 
-## Stage 9b — Persistent Ticket Repository (SQLite)
+## Stage 9b — Persistent Ticket Repository (SQLite) ✅ DONE
 
 **Goal:** Replace the per-process `InMemoryTicketRepository` with a shared SQLite database so that
 tickets created by the Worker are visible to the GoogleChatBot when processing button clicks.
@@ -322,9 +322,23 @@ concurrent reads (GoogleChatBot) and writes (Worker) don't block each other.
 Set the same absolute path in `Worker/appsettings.json` and `GoogleChatBot/appsettings.json`.
 In development, use user-secrets or `appsettings.Development.json` for the real path.
 
+### Bug fix — `DateTimeOffset` ORDER BY in SQLite
+EF Core cannot translate `DateTimeOffset` in a SQL `ORDER BY` clause when using the SQLite provider
+(runtime `NotSupportedException`). Fixed in `SqliteTicketRepository.GetAllAsync()`: tickets are
+loaded with a plain `ToListAsync()` and then sorted in memory via LINQ to Objects.
+
+```csharp
+// Before — throws at runtime
+return await ctx.Tickets.OrderByDescending(t => t.CreatedAt).ToListAsync();
+
+// After — works correctly
+var tickets = await ctx.Tickets.ToListAsync();
+return tickets.OrderByDescending(t => t.CreatedAt).ToList();
+```
+
 ### Result
 Tickets survive across process boundaries — clicking **Analyze** in Chat correctly finds the
-ticket created by the Drive Watcher.
+ticket created by the Drive Watcher. `/status` command no longer throws.
 
 ---
 

@@ -48,4 +48,10 @@ public sealed class InMemoryTicketRepository : ITicketRepository
 
         return Task.CompletedTask;
     }
+
+    public Task ClearAllAsync()
+    {
+        _store.Clear();
+        return Task.CompletedTask;
+    }
 }

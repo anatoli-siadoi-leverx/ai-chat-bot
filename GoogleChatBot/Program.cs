@@ -4,12 +4,14 @@ using GitHubTools;
 using GoogleChatBot.Commands;
 using GoogleChatBot.Controllers;
 using GoogleChatBot.Handlers;
+using GoogleChatBot.Services;
 using Infrastructure.Analysis;
 using Infrastructure.Fix;
 using Infrastructure.GitHub;
 using Infrastructure.Google;
 using Infrastructure.OpenAi;
 using Infrastructure.Persistence;
+using Microsoft.Extensions.Options;
 using Tools;
 using Tools.Abstractions;
 
@@ -17,7 +19,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
-// ── Swagger ───────────────────────────────────────────────────────────────────
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -33,27 +34,23 @@ builder.Services.AddSwaggerGen(options =>
     options.IncludeXmlComments(xmlPath);
 });
 
-// ── LLM ───────────────────────────────────────────────────────────────────────
 builder.Services.Configure<OpenAiOptions>(
     builder.Configuration.GetSection(OpenAiOptions.SectionName));
 
 builder.Services.AddSingleton<ILlmService, AgentService>();
 
-// ── ToolRegistry (empty — AgentService degrades to plain LLM completion) ─────
 builder.Services.AddSingleton<ToolRegistry>();
 
-// ── Ticket Repository (SQLite — shared with Worker) ──────────────────────────
 var ticketsConn = builder.Configuration.GetConnectionString("Tickets")
     ?? "Data Source=tickets.db";
 builder.Services.AddSqliteTickets(ticketsConn);
 builder.Services.AddSingleton<TicketWorkflow>();
 
-// ── Google Chat API (thread replies from ActionController) ───────────────────
 builder.Services.Configure<GoogleCredentialOptions>(
     builder.Configuration.GetSection(GoogleCredentialOptions.SectionName));
 builder.Services.AddSingleton<IGoogleChatApiService, GoogleChatApiService>();
+builder.Services.AddSingleton<IGoogleDriveService, GoogleDriveService>();
 
-// ── GitHub services ───────────────────────────────────────────────────────────
 builder.Services.Configure<GitHubOptions>(
     builder.Configuration.GetSection(GitHubOptions.SectionName));
 builder.Services.AddSingleton<IGitHubService, GitHubService>();
@@ -65,11 +62,13 @@ builder.Services.AddKeyedSingleton<ITool, GitHubRepoTool>("github_read_file");
 builder.Services.AddKeyedSingleton<ITool, GitHubSearchTool>("github_search_code");
 builder.Services.AddKeyedSingleton<ITool, CommitFileTool>("github_commit_file");
 
-// LLM pipeline services
 builder.Services.AddSingleton<IAnalysisService, AnalysisService>();
 builder.Services.AddSingleton<IFixService, FixService>();
 
-// ── Commands ──────────────────────────────────────────────────────────────────
+// ── Ticket background-task abstractions ───────────────────────────────────────
+builder.Services.AddSingleton<ITicketThreadNotifier, TicketThreadNotifier>();
+builder.Services.AddSingleton<ITicketPipelineRunner, TicketPipelineRunner>();
+
 builder.Services.AddSingleton<TicketCommand>(sp =>
     new TicketCommand(
         sp.GetRequiredService<ITicketRepository>(),
@@ -78,30 +77,33 @@ builder.Services.AddSingleton<TicketCommand>(sp =>
 builder.Services.AddSingleton<StatusCommand>(sp =>
     new StatusCommand(sp.GetRequiredService<ITicketRepository>()));
 
+builder.Services.AddSingleton<CleanCommand>(sp =>
+    new CleanCommand(sp.GetRequiredService<ITicketRepository>()));
+
+builder.Services.AddSingleton<ReportCommand>(sp =>
+    new ReportCommand(
+        sp.GetRequiredService<IGoogleDriveService>(),
+        sp.GetRequiredService<IOptions<GoogleCredentialOptions>>()));
+
 builder.Services.AddSingleton<HelpCommand>(sp => new HelpCommand([
     sp.GetRequiredService<TicketCommand>(),
     sp.GetRequiredService<StatusCommand>(),
+    sp.GetRequiredService<CleanCommand>(),
+    sp.GetRequiredService<ReportCommand>(),
 ]));
 
 builder.Services.AddSingleton<ICommand>(sp => sp.GetRequiredService<TicketCommand>());
 builder.Services.AddSingleton<ICommand>(sp => sp.GetRequiredService<StatusCommand>());
+builder.Services.AddSingleton<ICommand>(sp => sp.GetRequiredService<CleanCommand>());
+builder.Services.AddSingleton<ICommand>(sp => sp.GetRequiredService<ReportCommand>());
 builder.Services.AddSingleton<ICommand>(sp => sp.GetRequiredService<HelpCommand>());
 
 builder.Services.AddSingleton<CommandDispatcher>();
 
 // ── Card action handler ───────────────────────────────────────────────────────
-builder.Services.AddSingleton<ActionController>(sp => new ActionController(
-    sp.GetRequiredService<ITicketRepository>(),
-    sp.GetRequiredService<TicketWorkflow>(),
-    sp.GetRequiredService<IGoogleChatApiService>(),
-    sp.GetRequiredService<IAnalysisService>(),
-    sp.GetRequiredService<IFixService>(),
-    sp.GetRequiredService<ILogger<ActionController>>()));
+builder.Services.AddSingleton<ActionController>();
 
-// ── Event handler ─────────────────────────────────────────────────────────────
 builder.Services.AddSingleton<IChatEventHandler, ChatEventHandler>();
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 var app = builder.Build();
 

@@ -88,8 +88,7 @@ public sealed class FixService : IFixService
                 When done, briefly summarise what you changed.
                 """;
 
-            await RunLoopAsync(systemPrompt, userPrompt,
-                [_repoTool, _searchTool, _commitTool], ct);
+            await RunLoopAsync(systemPrompt, userPrompt, [_repoTool, _searchTool, _commitTool], ct);
 
             _logger.LogInformation("Fix agent loop completed for ticket {Id}", ticket.Id);
 
@@ -121,7 +120,8 @@ public sealed class FixService : IFixService
             _logger.LogDebug("Fix iteration {I}/{Max}", i + 1, MaxIterations);
 
             var completion = await _client.CompleteChatAsync(messages, options, cancellationToken: ct);
-            var reason     = completion.Value.FinishReason;
+
+            var reason = completion.Value.FinishReason;
 
             if (reason == ChatFinishReason.Stop)
             {

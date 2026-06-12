@@ -8,7 +8,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
-// ── Swagger ───────────────────────────────────────────────────────────────────
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -24,12 +23,10 @@ builder.Services.AddSwaggerGen(options =>
     options.IncludeXmlComments(xmlPath);
 });
 
-// ── GitHub services ───────────────────────────────────────────────────────────
 builder.Services.Configure<GitHubOptions>(
     builder.Configuration.GetSection(GitHubOptions.SectionName));
 builder.Services.AddSingleton<IGitHubService, GitHubService>();
 
-// ── GitHub tools — registered as plain ITool for ToolRegistry ────────────────
 // McpServer exposes these to external MCP clients via GET /mcp/tools.
 builder.Services.AddSingleton<ITool, GitHubRepoTool>();
 builder.Services.AddSingleton<ITool, GitHubSearchTool>();
@@ -37,11 +34,8 @@ builder.Services.AddSingleton<ITool, CommitFileTool>();
 
 builder.Services.AddSingleton<ToolRegistry>();
 
-// ── OpenAI (only needed if McpServer hosts an agent in the future) ────────────
 builder.Services.Configure<OpenAiOptions>(
     builder.Configuration.GetSection(OpenAiOptions.SectionName));
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 var app = builder.Build();
 

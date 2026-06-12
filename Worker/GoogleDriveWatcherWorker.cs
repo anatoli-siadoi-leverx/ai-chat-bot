@@ -61,9 +61,7 @@ public sealed class GoogleDriveWatcherWorker : BackgroundService
         while (!stoppingToken.IsCancellationRequested)
         {
             await PollAsync(stoppingToken);
-            await Task.Delay(
-                TimeSpan.FromSeconds(_options.PollingIntervalSeconds),
-                stoppingToken);
+            await Task.Delay(TimeSpan.FromSeconds(_options.PollingIntervalSeconds), stoppingToken);
         }
     }
 
@@ -122,21 +120,26 @@ public sealed class GoogleDriveWatcherWorker : BackgroundService
             SourceFileId = file.Id,
             State = TicketState.New
         };
+
         await _tickets.AddAsync(ticket);
 
         // 4. Post notification card to Google Chat (header only — no button)
         var post = await _chat.PostNotificationCardAsync(
             _options.ChatSpaceName, file.Name, description, ct);
 
-        // 5. Post thread card with file content + Analyze button
+        // 5. Post thread card with file content + Analyze button (+ Drive link/thumbnail)
         await _chat.PostFileContentCardAsync(
             _options.ChatSpaceName, post.ThreadName,
-            file.Name, content, ticket.Id, ct);
+            file.Name, content, ticket.Id,
+            driveWebViewLink:   file.WebViewLink,
+            driveThumbnailLink: file.ThumbnailLink,
+            ct);
 
         // 6. Save Chat message/thread names on the ticket
         ticket.MessageName = post.MessageName;
         ticket.ThreadName = post.ThreadName;
         ticket.SpaceName = _options.ChatSpaceName;
+
         await _tickets.UpdateAsync(ticket);
 
         // 7. Move file from New/ to InProcess/

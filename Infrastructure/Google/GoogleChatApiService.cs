@@ -1,7 +1,6 @@
 using Google.Apis.Auth.OAuth2;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -11,8 +10,6 @@ namespace Infrastructure.Google;
 
 /// <summary>
 /// Calls the Google Chat REST API using a service-account credential.
-/// Messages are sent as HTTP POST requests with a Bearer token obtained from
-/// <see cref="GoogleCredential"/>.
 /// </summary>
 public sealed class GoogleChatApiService : IGoogleChatApiService
 {
@@ -34,7 +31,9 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
     {
         _logger = logger;
         _http = new HttpClient();
-        _credential = GoogleCredential.FromFile(options.Value.ServiceAccountJson).CreateScoped(ChatScope);
+        _credential = GoogleCredential
+            .FromFile(options.Value.ServiceAccountJson)
+            .CreateScoped(ChatScope);
     }
 
     /// <inheritdoc/>
@@ -42,8 +41,6 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
         string spaceName, string fileName, string description,
         CancellationToken ct = default)
     {
-        // Notification card — header only, no buttons.
-        // The Analyze button is in the file-content card posted as a thread reply.
         var body = new
         {
             cardsV2 = new[]
@@ -55,7 +52,7 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
                     {
                         header = new
                         {
-                            title = $"New bug report: {fileName}",
+                            title = $"🐛 New bug report: {fileName}",
                             subtitle = description
                         }
                     }
@@ -64,7 +61,6 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
         };
 
         var response = await PostAsync(spaceName, body, threadName: null, ct);
-
         return ParseChatPostResult(response);
     }
 
@@ -72,11 +68,73 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
     public async Task PostFileContentCardAsync(
         string spaceName, string threadName,
         string fileName, string content, Guid ticketId,
+        string? driveWebViewLink   = null,
+        string? driveThumbnailLink = null,
         CancellationToken ct = default)
     {
         var displayText = string.IsNullOrWhiteSpace(content)
-            ? $"*File:* {fileName}\n_(Binary file — text extraction not available yet)_"
+            ? $"*File:* {fileName}\n_(Content not available)_"
             : $"*File:* {fileName}\n\n```\n{TruncateForChat(content)}\n```";
+
+        var widgets = new List<object>();
+
+        // Optional thumbnail — shown when Drive returns a preview image URL.
+        if (!string.IsNullOrEmpty(driveThumbnailLink))
+        {
+            if (!string.IsNullOrEmpty(driveWebViewLink))
+            {
+                widgets.Add(new
+                {
+                    image = new
+                    {
+                        imageUrl = driveThumbnailLink,
+                        altText = $"Preview: {fileName}",
+                        onClick = new { openLink = new { url = driveWebViewLink } }
+                    }
+                });
+            }
+            else
+            {
+                widgets.Add(new
+                {
+                    image = new
+                    {
+                        imageUrl = driveThumbnailLink,
+                        altText = $"Preview: {fileName}"
+                    }
+                });
+            }
+        }
+
+        widgets.Add(new { textParagraph = new { text = displayText } });
+
+        // Buttons: Analyze (always) + View in Drive (when link available).
+        var buttons = new List<object>
+        {
+            new
+            {
+                text = "🔍 Analyze",
+                onClick = new
+                {
+                    action = new
+                    {
+                        function = "analyze",
+                        parameters = new[] { new { key = "ticketId", value = ticketId.ToString() } }
+                    }
+                }
+            }
+        };
+
+        if (!string.IsNullOrEmpty(driveWebViewLink))
+        {
+            buttons.Add(new
+            {
+                text = "📁 View in Drive",
+                onClick = new { openLink = new { url = driveWebViewLink } }
+            });
+        }
+
+        widgets.Add(new { buttonList = new { buttons = buttons.ToArray() } });
 
         var body = new
         {
@@ -89,40 +147,7 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
                     {
                         sections = new[]
                         {
-                            new
-                            {
-                                widgets = new object[]
-                                {
-                                    new
-                                    {
-                                        textParagraph = new { text = displayText }
-                                    },
-                                    new
-                                    {
-                                        buttonList = new
-                                        {
-                                            buttons = new[]
-                                            {
-                                                new
-                                                {
-                                                    text    = "Analyze",
-                                                    onClick = new
-                                                    {
-                                                        action = new
-                                                        {
-                                                            function   = "analyze",
-                                                            parameters = new[]
-                                                            {
-                                                                new { key = "ticketId", value = ticketId.ToString() }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            new { widgets = widgets.ToArray() }
                         }
                     }
                 }
@@ -138,6 +163,7 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
         CancellationToken ct = default)
     {
         var body = new { text };
+
         await PostAsync(spaceName, body, threadName, ct);
     }
 
@@ -153,12 +179,11 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
         var token = await _credential.UnderlyingCredential
             .GetAccessTokenForRequestAsync(cancellationToken: ct);
 
-        // If threadName is provided, inject it into the body and use reply option
         object payload = threadName is not null
             ? MergeThread(body, threadName)
             : body;
 
-        var json    = JsonSerializer.Serialize(payload, _jsonOpts);
+        var json = JsonSerializer.Serialize(payload, _jsonOpts);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var url = threadName is not null
@@ -169,7 +194,6 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await _http.SendAsync(request, ct);
-
         var responseBody = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
@@ -177,7 +201,7 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
             _logger.LogError(
                 "Google Chat API error {Status}: {Body}",
                 (int)response.StatusCode, responseBody);
-            response.EnsureSuccessStatusCode();   // throws HttpRequestException
+            response.EnsureSuccessStatusCode();
         }
 
         _logger.LogDebug("Chat API response: {Body}", responseBody);
@@ -185,15 +209,10 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
         return responseBody;
     }
 
-    /// <summary>
-    /// Merges a <c>thread</c> property into the body object by round-tripping through
-    /// <see cref="JsonNode"/> so we don't need to declare a separate DTO type.
-    /// </summary>
     private static object MergeThread(object body, string threadName)
     {
         var node = JsonNode.Parse(JsonSerializer.Serialize(body, _jsonOpts))!.AsObject();
         node["thread"] = JsonNode.Parse(JsonSerializer.Serialize(new { name = threadName }));
-
         return node;
     }
 
@@ -201,11 +220,11 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
     {
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
-        var messageName = root.TryGetProperty("name", out var n) ? n.GetString() ?? string.Empty : string.Empty;
-        var threadName = root.TryGetProperty("thread", out var t)
-            && t.TryGetProperty("name", out var tn) ? tn.GetString() ?? string.Empty : string.Empty;
+        var msgName = root.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
+        var thdName = root.TryGetProperty("thread", out var t)
+                     && t.TryGetProperty("name", out var tn) ? tn.GetString() ?? "" : "";
 
-        return new ChatPostResult(messageName, threadName);
+        return new ChatPostResult(msgName, thdName);
     }
 
     /// <summary>Truncates content to Google Chat's message size limit (~4 KB).</summary>

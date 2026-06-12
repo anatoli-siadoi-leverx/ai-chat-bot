@@ -10,17 +10,15 @@ namespace GoogleChatBot.Cards;
 /// </summary>
 public static class TicketCardBuilder
 {
-    // Maps each reachable TicketState to the button label and action function name
-    // that will be sent back in CARD_CLICKED → action.actionMethodName.
     private static readonly IReadOnlyDictionary<TicketState, (string Label, string Function)> TransitionButtons =
         new Dictionary<TicketState, (string, string)>
         {
-            [TicketState.Analyzing] = ("Analyze", "analyze"),
-            [TicketState.Analyzed]  = ("Mark Analyzed", "mark_analyzed"),
-            [TicketState.Fixing] = ("Start Fix", "fix"),
-            [TicketState.Fixed] = ("Mark Fixed", "mark_fixed"),
-            [TicketState.Closed] = ("Close", "close"),
-            [TicketState.New] = ("Retry", "retry"),
+            [TicketState.Analyzing] = ("🔍 Analyze", "analyze"),
+            [TicketState.Analyzed]  = ("✅ Mark Analyzed", "mark_analyzed"),
+            [TicketState.Fixing]    = ("🔧 Start Fix", "fix"),
+            [TicketState.Fixed]     = ("✅ Mark Fixed", "mark_fixed"),
+            [TicketState.Closed]    = ("🔒 Close", "close"),
+            [TicketState.New]       = ("🔄 Retry", "retry"),
         };
 
     /// <summary>
@@ -43,7 +41,12 @@ public static class TicketCardBuilder
 
         if (!string.IsNullOrEmpty(ticket.AnalysisResult))
         {
-            builder.AddParagraph($"<b>Analysis:</b> {ticket.AnalysisResult}");
+            builder.AddParagraph($"🔍 <b>Analysis:</b><br>{ticket.AnalysisResult}");
+        }
+
+        if (!string.IsNullOrEmpty(ticket.BranchName))
+        {
+            builder.AddParagraph($"🔧 <b>Fix branch:</b> <code>{ticket.BranchName}</code>");
         }
 
         foreach (var state in available)

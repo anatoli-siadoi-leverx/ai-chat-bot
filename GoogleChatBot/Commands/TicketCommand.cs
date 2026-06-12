@@ -13,7 +13,7 @@ namespace GoogleChatBot.Commands;
 public sealed class TicketCommand : ICommand
 {
     private readonly ITicketRepository _repo;
-    private readonly TicketWorkflow    _workflow;
+    private readonly TicketWorkflow _workflow;
 
     public string Name => "ticket";
     public string Description => "Creates a new error ticket. Usage: `/ticket <description>`";

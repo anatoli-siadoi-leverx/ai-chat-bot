@@ -14,6 +14,7 @@ public sealed class SqliteTicketRepository(IDbContextFactory<AppDbContext> facto
     public async Task AddAsync(ErrorTicket ticket)
     {
         await using var ctx = await factory.CreateDbContextAsync();
+
         ctx.Tickets.Add(ticket);
 
         await ctx.SaveChangesAsync();
@@ -30,7 +31,11 @@ public sealed class SqliteTicketRepository(IDbContextFactory<AppDbContext> facto
     {
         await using var ctx = await factory.CreateDbContextAsync();
 
-        return await ctx.Tickets.OrderByDescending(t => t.CreatedAt).ToListAsync();
+        // SQLite stores DateTimeOffset as TEXT and cannot translate it in ORDER BY.
+        // Load all tickets first, then sort in memory.
+        var tickets = await ctx.Tickets.ToListAsync();
+
+        return tickets.OrderByDescending(t => t.CreatedAt).ToList();
     }
 
     public async Task UpdateAsync(ErrorTicket ticket)
@@ -40,5 +45,12 @@ public sealed class SqliteTicketRepository(IDbContextFactory<AppDbContext> facto
         ctx.Tickets.Update(ticket);
 
         await ctx.SaveChangesAsync();
+    }
+
+    public async Task ClearAllAsync()
+    {
+        await using var ctx = await factory.CreateDbContextAsync();
+
+        await ctx.Tickets.ExecuteDeleteAsync();
     }
 }

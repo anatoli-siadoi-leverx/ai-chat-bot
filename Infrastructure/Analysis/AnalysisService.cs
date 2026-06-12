@@ -65,12 +65,12 @@ public sealed class AnalysisService : IAnalysisService
 
         try
         {
-            return await RunLoopAsync(systemPrompt, userPrompt,
-                [_repoTool, _searchTool], ct);
+            return await RunLoopAsync(systemPrompt, userPrompt, [_repoTool, _searchTool], ct);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Analysis failed for ticket {Id}", ticket.Id);
+
             return $"Analysis failed: {ex.Message}";
         }
     }

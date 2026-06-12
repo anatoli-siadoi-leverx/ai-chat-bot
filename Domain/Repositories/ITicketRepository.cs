@@ -8,4 +8,7 @@ public interface ITicketRepository
     Task<ErrorTicket?> GetByIdAsync(Guid id);
     Task<IList<ErrorTicket>> GetAllAsync();
     Task UpdateAsync(ErrorTicket ticket);
+
+    /// <summary>Permanently deletes all tickets from the store.</summary>
+    Task ClearAllAsync();
 }
