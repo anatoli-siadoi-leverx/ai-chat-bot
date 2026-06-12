@@ -11,14 +11,14 @@ public sealed class TicketWorkflow
     // All permitted (From → To) transitions.
     private static readonly HashSet<(TicketState From, TicketState To)> AllowedTransitions =
     [
-        (TicketState.New,       TicketState.Analyzing),
+        (TicketState.New, TicketState.Analyzing),
         (TicketState.Analyzing, TicketState.Analyzed),
         (TicketState.Analyzing, TicketState.Failed),
-        (TicketState.Analyzed,  TicketState.Fixing),
-        (TicketState.Fixing,    TicketState.Fixed),
-        (TicketState.Fixing,    TicketState.Failed),
-        (TicketState.Fixed,     TicketState.Closed),
-        (TicketState.Failed,    TicketState.New),    // allow retry
+        (TicketState.Analyzed, TicketState.Fixing),
+        (TicketState.Fixing, TicketState.Fixed),
+        (TicketState.Fixing, TicketState.Failed),
+        (TicketState.Fixed, TicketState.Closed),
+        (TicketState.Failed, TicketState.New),    // allow retry
     ];
 
     /// <summary>Returns true if the ticket can move to <paramref name="target"/>.</summary>
@@ -42,10 +42,9 @@ public sealed class TicketWorkflow
     public void Transition(ErrorTicket ticket, TicketState target)
     {
         if (!CanTransition(ticket, target))
-            throw new WorkflowException(
-                $"Transition {ticket.State} → {target} is not allowed for ticket {ticket.Id}.");
+            throw new WorkflowException($"Transition {ticket.State} → {target} is not allowed for ticket {ticket.Id}.");
 
-        ticket.State     = target;
+        ticket.State = target;
         ticket.UpdatedAt = DateTimeOffset.UtcNow;
     }
 }

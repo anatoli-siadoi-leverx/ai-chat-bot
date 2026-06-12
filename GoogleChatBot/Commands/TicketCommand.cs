@@ -15,12 +15,12 @@ public sealed class TicketCommand : ICommand
     private readonly ITicketRepository _repo;
     private readonly TicketWorkflow    _workflow;
 
-    public string Name        => "ticket";
+    public string Name => "ticket";
     public string Description => "Creates a new error ticket. Usage: `/ticket <description>`";
 
     public TicketCommand(ITicketRepository repo, TicketWorkflow workflow)
     {
-        _repo     = repo;
+        _repo = repo;
         _workflow = workflow;
     }
 
@@ -32,14 +32,15 @@ public sealed class TicketCommand : ICommand
         var description = input["/ticket".Length..].Trim();
 
         if (string.IsNullOrWhiteSpace(description))
-            return BotResponse.FromText(
-                "Usage: `/ticket <description>` — provide a short description of the error.");
+        {
+            return BotResponse.FromText("Usage: `/ticket <description>` — provide a short description of the error.");
+        }
 
         var ticket = new ErrorTicket
         {
-            Title       = description.Length > 80 ? description[..80] : description,
+            Title = description.Length > 80 ? description[..80] : description,
             Description = description,
-            Source      = "Manual",
+            Source = "Manual",
         };
 
         await _repo.AddAsync(ticket);

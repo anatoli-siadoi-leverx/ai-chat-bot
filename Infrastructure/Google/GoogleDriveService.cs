@@ -13,23 +13,23 @@ namespace Infrastructure.Google;
 /// </summary>
 public sealed class GoogleDriveService : IGoogleDriveService
 {
-    private readonly DriveService                    _drive;
-    private readonly ILogger<GoogleDriveService>     _logger;
+    private readonly DriveService _drive;
+    private readonly ILogger<GoogleDriveService> _logger;
 
     // MIME types that Drive uses for native Google documents
-    private const string GoogleDocMime  = "application/vnd.google-apps.document";
-    private const string PlainTextMime  = "text/plain";
+    private const string GoogleDocMime = "application/vnd.google-apps.document";
+    private const string PlainTextMime = "text/plain";
 
     public GoogleDriveService(
         IOptions<GoogleCredentialOptions> options,
-        ILogger<GoogleDriveService>       logger)
+        ILogger<GoogleDriveService> logger)
     {
         _logger = logger;
         var credential = GoogleCredential.FromFile(options.Value.ServiceAccountJson).CreateScoped(DriveService.Scope.Drive);
         _drive = new DriveService(new BaseClientService.Initializer
         {
             HttpClientInitializer = credential,
-            ApplicationName       = "AiChatBot-DriveWatcher"
+            ApplicationName = "AiChatBot-DriveWatcher"
         });
     }
 
@@ -38,7 +38,7 @@ public sealed class GoogleDriveService : IGoogleDriveService
         string folderId, CancellationToken ct = default)
     {
         var request = _drive.Files.List();
-        request.Q      = $"'{folderId}' in parents and trashed = false";
+        request.Q = $"'{folderId}' in parents and trashed = false";
         request.Fields = "files(id,name,mimeType)";
 
         var response = await request.ExecuteAsync(ct);
@@ -58,17 +58,21 @@ public sealed class GoogleDriveService : IGoogleDriveService
             {
                 // Export Google Doc as plain text
                 var exportRequest = _drive.Files.Export(fileId, PlainTextMime);
-                using var stream  = new MemoryStream();
+                using var stream = new MemoryStream();
+
                 await exportRequest.DownloadAsync(stream, ct);
+
                 return System.Text.Encoding.UTF8.GetString(stream.ToArray());
             }
 
             if (mimeType.StartsWith("text/", StringComparison.OrdinalIgnoreCase))
             {
                 // Direct download for plain-text files
-                var getRequest    = _drive.Files.Get(fileId);
+                var getRequest = _drive.Files.Get(fileId);
                 using var stream  = new MemoryStream();
+
                 await getRequest.DownloadAsync(stream, ct);
+
                 return System.Text.Encoding.UTF8.GetString(stream.ToArray());
             }
 
@@ -76,6 +80,7 @@ public sealed class GoogleDriveService : IGoogleDriveService
             _logger.LogInformation(
                 "File {FileId} has unsupported MIME type {MimeType}; text extraction skipped",
                 fileId, mimeType);
+
             return string.Empty;
         }
         catch (Exception ex)
@@ -89,14 +94,13 @@ public sealed class GoogleDriveService : IGoogleDriveService
     public async Task MoveFileAsync(
         string fileId, string fromFolderId, string toFolderId, CancellationToken ct = default)
     {
-        var update         = _drive.Files.Update(new GDriveFile(), fileId);
-        update.AddParents    = toFolderId;
+        var update = _drive.Files.Update(new GDriveFile(), fileId);
+        update.AddParents = toFolderId;
         update.RemoveParents = fromFolderId;
-        update.Fields        = "id,parents";
+        update.Fields = "id,parents";
+
         await update.ExecuteAsync(ct);
 
-        _logger.LogInformation(
-            "Moved Drive file {FileId} from {From} to {To}",
-            fileId, fromFolderId, toFolderId);
+        _logger.LogInformation("Moved Drive file {FileId} from {From} to {To}", fileId, fromFolderId, toFolderId);
     }
 }

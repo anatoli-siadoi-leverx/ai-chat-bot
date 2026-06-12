@@ -19,6 +19,6 @@ public abstract class BotResponse
         public CardResponse CardResponse { get; } = card;
     }
 
-    public static BotResponse FromText(string text)    => new TextOnly(text);
+    public static BotResponse FromText(string text) => new TextOnly(text);
     public static BotResponse FromCard(CardResponse card) => new Card(card);
 }

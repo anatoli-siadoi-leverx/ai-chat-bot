@@ -23,30 +23,29 @@ namespace Infrastructure.Fix;
 /// </summary>
 public sealed class FixService : IFixService
 {
-    private readonly ChatClient          _client;
-    private readonly IGitHubService      _github;
-    private readonly ITool               _repoTool;
-    private readonly ITool               _searchTool;
-    private readonly ITool               _commitTool;
+    private readonly ChatClient _client;
+    private readonly IGitHubService _github;
+    private readonly ITool _repoTool;
+    private readonly ITool _searchTool;
+    private readonly ITool _commitTool;
     private readonly ILogger<FixService> _logger;
 
-    private const int MaxIterations = 10;
+    private const int MaxIterations = 5;
 
     public FixService(
-        IOptions<OpenAiOptions>                               openAiOptions,
-        IGitHubService                                        github,
-        [FromKeyedServices("github_read_file")]   ITool       readFileTool,
-        [FromKeyedServices("github_search_code")] ITool       searchCodeTool,
-        [FromKeyedServices("github_commit_file")] ITool       commitFileTool,
-        ILogger<FixService>                                   logger)
+        IOptions<OpenAiOptions> openAiOptions,
+        IGitHubService github,
+        [FromKeyedServices("github_read_file")] ITool readFileTool,
+        [FromKeyedServices("github_search_code")] ITool searchCodeTool,
+        [FromKeyedServices("github_commit_file")] ITool commitFileTool,
+        ILogger<FixService> logger)
     {
-        _client     = new OpenAIClient(openAiOptions.Value.ApiKey)
-                          .GetChatClient(openAiOptions.Value.Model);
-        _github     = github;
-        _repoTool   = readFileTool;
+        _client = new OpenAIClient(openAiOptions.Value.ApiKey).GetChatClient(openAiOptions.Value.Model);
+        _github = github;
+        _repoTool = readFileTool;
         _searchTool = searchCodeTool;
         _commitTool = commitFileTool;
-        _logger     = logger;
+        _logger = logger;
     }
 
     /// <inheritdoc/>
@@ -60,6 +59,7 @@ public sealed class FixService : IFixService
         {
             // Create the branch first so the LLM can commit to it directly.
             await _github.CreateBranchAsync(branchName, ct: ct);
+
             _logger.LogInformation("Fix branch {Branch} created for ticket {Id}", branchName, ticket.Id);
 
             var systemPrompt = $"""
@@ -92,16 +92,16 @@ public sealed class FixService : IFixService
                 [_repoTool, _searchTool, _commitTool], ct);
 
             _logger.LogInformation("Fix agent loop completed for ticket {Id}", ticket.Id);
+
             return branchName;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fix pipeline failed for ticket {Id}", ticket.Id);
+
             throw;
         }
     }
-
-    // ── Agent loop ────────────────────────────────────────────────────────────
 
     private async Task RunLoopAsync(
         string systemPrompt, string userPrompt,
@@ -124,7 +124,9 @@ public sealed class FixService : IFixService
             var reason     = completion.Value.FinishReason;
 
             if (reason == ChatFinishReason.Stop)
+            {
                 return;
+            }
 
             if (reason == ChatFinishReason.ToolCalls)
             {
@@ -153,24 +155,27 @@ public sealed class FixService : IFixService
     private static ChatCompletionOptions BuildOptions(IReadOnlyList<ITool> tools)
     {
         var options = new ChatCompletionOptions();
+
         foreach (var t in tools)
+        {
             options.Tools.Add(ChatTool.CreateFunctionTool(
                 t.Name, t.Description, BinaryData.FromString(t.InputSchema)));
+        }
+            
         return options;
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static string GenerateBranchName(ErrorTicket ticket)
     {
         var shortId = ticket.Id.ToString("N")[..8];
-        var slug    = new string(
+        var slug = new string(
             ticket.Title
                   .ToLowerInvariant()
                   .Select(c => char.IsLetterOrDigit(c) ? c : '-')
                   .Take(30)
                   .ToArray())
             .Trim('-');
+
         return $"fix/{shortId}-{slug}";
     }
 }

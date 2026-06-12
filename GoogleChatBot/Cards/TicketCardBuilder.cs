@@ -15,12 +15,12 @@ public static class TicketCardBuilder
     private static readonly IReadOnlyDictionary<TicketState, (string Label, string Function)> TransitionButtons =
         new Dictionary<TicketState, (string, string)>
         {
-            [TicketState.Analyzing] = ("Analyze",       "analyze"),
+            [TicketState.Analyzing] = ("Analyze", "analyze"),
             [TicketState.Analyzed]  = ("Mark Analyzed", "mark_analyzed"),
-            [TicketState.Fixing]    = ("Start Fix",     "fix"),
-            [TicketState.Fixed]     = ("Mark Fixed",    "mark_fixed"),
-            [TicketState.Closed]    = ("Close",         "close"),
-            [TicketState.New]       = ("Retry",         "retry"),
+            [TicketState.Fixing] = ("Start Fix", "fix"),
+            [TicketState.Fixed] = ("Mark Fixed", "mark_fixed"),
+            [TicketState.Closed] = ("Close", "close"),
+            [TicketState.New] = ("Retry", "retry"),
         };
 
     /// <summary>
@@ -42,12 +42,16 @@ public static class TicketCardBuilder
             .AddParagraph(ticket.Description);
 
         if (!string.IsNullOrEmpty(ticket.AnalysisResult))
+        {
             builder.AddParagraph($"<b>Analysis:</b> {ticket.AnalysisResult}");
+        }
 
         foreach (var state in available)
         {
             if (TransitionButtons.TryGetValue(state, out var btn))
+            {
                 builder.AddButton(btn.Label, btn.Function, parameters);
+            }
         }
 
         return builder.Build();

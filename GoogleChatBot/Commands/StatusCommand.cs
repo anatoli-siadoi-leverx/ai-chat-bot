@@ -10,7 +10,7 @@ public sealed class StatusCommand : ICommand
 {
     private readonly ITicketRepository _repo;
 
-    public string Name        => "status";
+    public string Name => "status";
     public string Description => "Lists all error tickets and their states.";
 
     public StatusCommand(ITicketRepository repo) => _repo = repo;
@@ -24,8 +24,7 @@ public sealed class StatusCommand : ICommand
         var tickets = await _repo.GetAllAsync();
 
         if (tickets.Count == 0)
-            return BotResponse.FromText(
-                "No tickets found. Use `/ticket <description>` to create one.");
+            return BotResponse.FromText("No tickets found. Use `/ticket <description>` to create one.");
 
         var lines = tickets.Select(t =>
             $"• `{t.Id:D}` — **{t.Title}** | State: `{t.State}` | {t.CreatedAt:yyyy-MM-dd HH:mm} UTC");

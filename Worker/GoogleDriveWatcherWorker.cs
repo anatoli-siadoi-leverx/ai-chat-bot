@@ -25,30 +25,30 @@ namespace Worker;
 /// </summary>
 public sealed class GoogleDriveWatcherWorker : BackgroundService
 {
-    private readonly IGoogleDriveService               _drive;
-    private readonly IDriveFileReader                  _fileReader;
-    private readonly IGoogleChatApiService             _chat;
-    private readonly ILlmService                       _llm;
-    private readonly ITicketRepository                 _tickets;
-    private readonly GoogleCredentialOptions           _options;
+    private readonly IGoogleDriveService _drive;
+    private readonly IDriveFileReader _fileReader;
+    private readonly IGoogleChatApiService _chat;
+    private readonly ILlmService _llm;
+    private readonly ITicketRepository _tickets;
+    private readonly GoogleCredentialOptions _options;
     private readonly ILogger<GoogleDriveWatcherWorker> _logger;
 
     public GoogleDriveWatcherWorker(
-        IGoogleDriveService               drive,
-        IDriveFileReader                  fileReader,
-        IGoogleChatApiService             chat,
-        ILlmService                       llm,
-        ITicketRepository                 tickets,
+        IGoogleDriveService drive,
+        IDriveFileReader fileReader,
+        IGoogleChatApiService chat,
+        ILlmService llm,
+        ITicketRepository tickets,
         IOptions<GoogleCredentialOptions> options,
         ILogger<GoogleDriveWatcherWorker> logger)
     {
-        _drive      = drive;
+        _drive = drive;
         _fileReader = fileReader;
-        _chat       = chat;
-        _llm        = llm;
-        _tickets    = tickets;
-        _options    = options.Value;
-        _logger     = logger;
+        _chat = chat;
+        _llm = llm;
+        _tickets = tickets;
+        _options = options.Value;
+        _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -67,8 +67,6 @@ public sealed class GoogleDriveWatcherWorker : BackgroundService
         }
     }
 
-    // ── Poll ──────────────────────────────────────────────────────────────────
-
     private async Task PollAsync(CancellationToken ct)
     {
         IReadOnlyList<DriveFile> files;
@@ -79,12 +77,14 @@ public sealed class GoogleDriveWatcherWorker : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to list files in Drive folder {FolderId}", _options.NewFolderId);
+
             return;
         }
 
         if (files.Count == 0)
         {
             _logger.LogDebug("No new files in Drive folder {FolderId}", _options.NewFolderId);
+
             return;
         }
 
@@ -103,8 +103,6 @@ public sealed class GoogleDriveWatcherWorker : BackgroundService
         }
     }
 
-    // ── Process a single file ─────────────────────────────────────────────────
-
     private async Task ProcessFileAsync(DriveFile file, CancellationToken ct)
     {
         _logger.LogInformation("Processing Drive file {FileId} ({Name})", file.Id, file.Name);
@@ -118,11 +116,11 @@ public sealed class GoogleDriveWatcherWorker : BackgroundService
         // 3. Create the ticket
         var ticket = new ErrorTicket
         {
-            Title        = file.Name,
-            Description  = content,
-            Source       = "GoogleDrive",
+            Title = file.Name,
+            Description = content,
+            Source = "GoogleDrive",
             SourceFileId = file.Id,
-            State        = TicketState.New
+            State = TicketState.New
         };
         await _tickets.AddAsync(ticket);
 
@@ -137,26 +135,23 @@ public sealed class GoogleDriveWatcherWorker : BackgroundService
 
         // 6. Save Chat message/thread names on the ticket
         ticket.MessageName = post.MessageName;
-        ticket.ThreadName  = post.ThreadName;
-        ticket.SpaceName   = _options.ChatSpaceName;
+        ticket.ThreadName = post.ThreadName;
+        ticket.SpaceName = _options.ChatSpaceName;
         await _tickets.UpdateAsync(ticket);
 
         // 7. Move file from New/ to InProcess/
-        await _drive.MoveFileAsync(
-            file.Id, _options.NewFolderId, _options.InProcessFolderId, ct);
+        await _drive.MoveFileAsync(file.Id, _options.NewFolderId, _options.InProcessFolderId, ct);
 
-        _logger.LogInformation(
-            "Ticket {TicketId} created for file {FileId}; file moved to InProcess",
-            ticket.Id, file.Id);
+        _logger.LogInformation("Ticket {TicketId} created for file {FileId}; file moved to InProcess", ticket.Id, file.Id);
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private async Task<string> GenerateDescriptionAsync(
         string fileName, string content, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(content))
+        {
             return $"New bug report file: {fileName}";
+        }
 
         try
         {
@@ -169,6 +164,7 @@ public sealed class GoogleDriveWatcherWorker : BackgroundService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "LLM description generation failed for {File}", fileName);
+
             return $"New bug report file: {fileName}";
         }
     }

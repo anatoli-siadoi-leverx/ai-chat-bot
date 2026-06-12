@@ -23,8 +23,8 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new()
     {
-        Title       = "Google Chat Bot",
-        Version     = "v1",
+        Title = "Google Chat Bot",
+        Version = "v1",
         Description = "Webhook endpoint and ticket management for the AI Chat Bot."
     });
 

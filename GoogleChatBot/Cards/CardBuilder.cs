@@ -7,18 +7,18 @@ namespace GoogleChatBot.Cards;
 /// </summary>
 public sealed class CardBuilder
 {
-    private string  _cardId   = Guid.NewGuid().ToString("N")[..8];
-    private string  _title    = string.Empty;
+    private string  _cardId = Guid.NewGuid().ToString("N")[..8];
+    private string  _title = string.Empty;
     private string? _subtitle;
 
-    private readonly List<string>       _paragraphs = [];
+    private readonly List<string> _paragraphs = [];
     private readonly List<ButtonAction> _buttons    = [];
 
-    public CardBuilder WithCardId(string id)       { _cardId    = id;       return this; }
-    public CardBuilder WithTitle(string title)     { _title     = title;    return this; }
-    public CardBuilder WithSubtitle(string sub)    { _subtitle  = sub;      return this; }
-    public CardBuilder AddParagraph(string text)   { _paragraphs.Add(text); return this; }
-    public CardBuilder AddButton(ButtonAction btn) { _buttons.Add(btn);     return this; }
+    public CardBuilder WithCardId(string id) { _cardId = id; return this; }
+    public CardBuilder WithTitle(string title) { _title = title; return this; }
+    public CardBuilder WithSubtitle(string sub) { _subtitle  = sub; return this; }
+    public CardBuilder AddParagraph(string text) { _paragraphs.Add(text); return this; }
+    public CardBuilder AddButton(ButtonAction btn) { _buttons.Add(btn); return this; }
 
     /// <summary>Convenience overload — creates a <see cref="ButtonAction"/> inline.</summary>
     public CardBuilder AddButton(
@@ -33,22 +33,23 @@ public sealed class CardBuilder
         var widgets = new List<CardWidget>();
 
         foreach (var text in _paragraphs)
+        {
             widgets.Add(new CardWidget { TextParagraph = new TextParagraphWidget { Text = text } });
+        }
 
         if (_buttons.Count > 0)
         {
             var cardButtons = _buttons
                 .Select(b => new CardButtonWidget
                 {
-                    Text    = b.Label,
+                    Text = b.Label,
                     OnClick = new CardButtonOnClick
                     {
                         Action = new CardButtonAction
                         {
-                            Function   = b.FunctionName,
+                            Function = b.FunctionName,
                             Parameters = b.Parameters
-                                .Select(p => new CardActionParameter { Key = p.Key, Value = p.Value })
-                                .ToList()
+                                .Select(p => new CardActionParameter { Key = p.Key, Value = p.Value }).ToList()
                         }
                     }
                 })
@@ -64,9 +65,9 @@ public sealed class CardBuilder
                 new CardV2Wrapper
                 {
                     CardId = _cardId,
-                    Card   = new CardV2
+                    Card = new CardV2
                     {
-                        Header   = new CardHeader { Title = _title, Subtitle = _subtitle },
+                        Header = new CardHeader { Title = _title, Subtitle = _subtitle },
                         Sections = [new CardSection { Widgets = widgets }]
                     }
                 }

@@ -39,7 +39,9 @@ public sealed class McpController : ControllerBase
         var tool = _registry.Find(request.ToolName);
 
         if (tool is null)
+        {
             return NotFound(new { Error = $"Tool '{request.ToolName}' not found." });
+        }
 
         var result = await tool.ExecuteAsync(request.Input);
 

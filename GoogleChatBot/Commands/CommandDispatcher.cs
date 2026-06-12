@@ -28,7 +28,9 @@ public sealed class CommandDispatcher
     public async Task<BotResponse?> DispatchAsync(string input)
     {
         if (string.IsNullOrWhiteSpace(input) || input[0] != '/')
+        {
             return null;
+        }
 
         var command = _commands.FirstOrDefault(c => c.CanHandle(input));
 
@@ -36,11 +38,12 @@ public sealed class CommandDispatcher
         {
             var name = input.Split(' ')[0];
             _logger.LogWarning("Unknown command: {Command}", name);
-            return BotResponse.FromText(
-                $"Unknown command: `{name}`. Type `/help` to see available commands.");
+
+            return BotResponse.FromText($"Unknown command: `{name}`. Type `/help` to see available commands.");
         }
 
         _logger.LogInformation("Dispatching command /{Command}", command.Name);
+
         return await command.ExecuteAsync(input);
     }
 }

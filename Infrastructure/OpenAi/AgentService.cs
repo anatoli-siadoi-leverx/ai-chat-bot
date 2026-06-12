@@ -33,10 +33,10 @@ public sealed class AgentService : ILlmService
         ToolRegistry toolRegistry,
         ILogger<AgentService> logger)
     {
-        _options      = options.Value;
+        _options = options.Value;
         _toolRegistry = toolRegistry;
-        _logger       = logger;
-        _chatClient   = new OpenAIClient(_options.ApiKey).GetChatClient(_options.Model);
+        _logger = logger;
+        _chatClient = new OpenAIClient(_options.ApiKey).GetChatClient(_options.Model);
     }
 
     /// <inheritdoc/>
@@ -59,12 +59,14 @@ public sealed class AgentService : ILlmService
             _logger.LogDebug("Agent iteration {Iter}/{Max}", i + 1, MaxIterations);
 
             var completion = await _chatClient.CompleteChatAsync(messages, completionOptions);
-            var reason     = completion.Value.FinishReason;
+            var reason = completion.Value.FinishReason;
 
             _logger.LogDebug("Finish reason: {Reason}", reason);
 
             if (reason == ChatFinishReason.Stop)
+            {
                 return completion.Value.Content[0].Text;
+            }
 
             if (reason == ChatFinishReason.ToolCalls)
             {
@@ -87,10 +89,9 @@ public sealed class AgentService : ILlmService
         }
 
         _logger.LogWarning("Agent loop hit max iterations ({Max})", MaxIterations);
+
         return "I'm sorry, I was unable to complete your request within the allowed steps.";
     }
-
-    // ── Private helpers ───────────────────────────────────────────────────────
 
     private ChatCompletionOptions BuildCompletionOptions()
     {
@@ -102,9 +103,9 @@ public sealed class AgentService : ILlmService
         foreach (var tool in _toolRegistry.GetAll())
         {
             options.Tools.Add(ChatTool.CreateFunctionTool(
-                functionName:        tool.Name,
+                functionName: tool.Name,
                 functionDescription: tool.Description,
-                functionParameters:  BinaryData.FromString(tool.InputSchema)));
+                functionParameters: BinaryData.FromString(tool.InputSchema)));
         }
 
         return options;
@@ -117,6 +118,7 @@ public sealed class AgentService : ILlmService
         if (tool is null)
         {
             _logger.LogWarning("LLM requested unknown tool: {Tool}", toolCall.FunctionName);
+
             return $"Error: tool '{toolCall.FunctionName}' not found.";
         }
 
@@ -127,15 +129,17 @@ public sealed class AgentService : ILlmService
         {
             // Tools take a plain string. For single-parameter tools (e.g. "name") we
             // extract the first string property. No-parameter tools receive empty string.
-            var input  = ExtractFirstStringArg(argsJson);
+            var input = ExtractFirstStringArg(argsJson);
             var result = await tool.ExecuteAsync(input);
 
             _logger.LogInformation("Tool {Tool} → {Result}", toolCall.FunctionName, result);
+
             return result;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Tool {Tool} threw an exception", toolCall.FunctionName);
+
             return $"Error executing {toolCall.FunctionName}: {ex.Message}";
         }
     }
@@ -147,15 +151,20 @@ public sealed class AgentService : ILlmService
     private static string ExtractFirstStringArg(string json)
     {
         if (string.IsNullOrWhiteSpace(json) || json.Trim() is "{}" or "{ }")
+        {
             return string.Empty;
+        }
 
         try
         {
             using var doc = JsonDocument.Parse(json);
+
             foreach (var prop in doc.RootElement.EnumerateObject())
             {
                 if (prop.Value.ValueKind == JsonValueKind.String)
+                {
                     return prop.Value.GetString() ?? string.Empty;
+                }
             }
         }
         catch (JsonException)

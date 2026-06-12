@@ -17,7 +17,7 @@ public static class PersistenceExtensions
     /// </summary>
     public static IServiceCollection AddSqliteTickets(
         this IServiceCollection services,
-        string                  connectionString)
+        string connectionString)
     {
         services.AddDbContextFactory<AppDbContext>(options =>
             options.UseSqlite(connectionString));

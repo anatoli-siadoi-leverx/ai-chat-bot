@@ -14,8 +14,8 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new()
     {
-        Title       = "MCP Server",
-        Version     = "v1",
+        Title = "MCP Server",
+        Version = "v1",
         Description = "HTTP API for listing and calling AI tools via the Model Context Protocol."
     });
 

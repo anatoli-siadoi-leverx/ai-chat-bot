@@ -16,8 +16,8 @@ public sealed class OpenAiService : ILlmService
 
     public OpenAiService(IOptions<OpenAiOptions> options, ILogger<OpenAiService> logger)
     {
-        _options    = options.Value;
-        _logger     = logger;
+        _options = options.Value;
+        _logger = logger;
         _chatClient = new OpenAIClient(_options.ApiKey).GetChatClient(_options.Model);
     }
 

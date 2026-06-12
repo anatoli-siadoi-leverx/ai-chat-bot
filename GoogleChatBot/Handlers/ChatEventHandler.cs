@@ -12,21 +12,21 @@ namespace GoogleChatBot.Handlers;
 /// </summary>
 public sealed class ChatEventHandler : IChatEventHandler
 {
-    private readonly CommandDispatcher        _dispatcher;
-    private readonly ILlmService              _llm;
-    private readonly ActionController         _actionController;
+    private readonly CommandDispatcher _dispatcher;
+    private readonly ILlmService _llm;
+    private readonly ActionController _actionController;
     private readonly ILogger<ChatEventHandler> _logger;
 
     public ChatEventHandler(
-        CommandDispatcher         dispatcher,
-        ILlmService               llm,
-        ActionController          actionController,
+        CommandDispatcher dispatcher,
+        ILlmService llm,
+        ActionController actionController,
         ILogger<ChatEventHandler> logger)
     {
-        _dispatcher       = dispatcher;
-        _llm              = llm;
+        _dispatcher = dispatcher;
+        _llm = llm;
         _actionController = actionController;
-        _logger           = logger;
+        _logger = logger;
     }
 
     public BotResponse OnAddedToSpace(ChatEvent chatEvent)
@@ -39,17 +39,22 @@ public sealed class ChatEventHandler : IChatEventHandler
 
     public async Task<BotResponse> OnMessageAsync(ChatEvent chatEvent)
     {
-        var text   = chatEvent.Message?.Text?.Trim() ?? string.Empty;
+        var text = chatEvent.Message?.Text?.Trim() ?? string.Empty;
         var sender = chatEvent.Message?.Sender?.DisplayName ?? "Unknown";
 
         // 1. Slash-commands have priority.
         var commandResult = await _dispatcher.DispatchAsync(text);
+
         if (commandResult is not null)
+        {
             return commandResult;
+        }
 
         // 2. Empty message guard.
         if (string.IsNullOrEmpty(text))
+        {
             return BotResponse.FromText($"Hi **{sender}**! How can I help you?");
+        }
 
         // 3. Fallback: send to LLM.
         return BotResponse.FromText(await CallLlmAsync(text));
@@ -60,11 +65,11 @@ public sealed class ChatEventHandler : IChatEventHandler
         if (chatEvent.Action is null)
         {
             _logger.LogWarning("CARD_CLICKED received with no action payload");
+
             return BotResponse.FromText("Card action received but no action data found.");
         }
 
-        _logger.LogInformation(
-            "Card action: Function={Function}", chatEvent.Action.ActionMethodName);
+        _logger.LogInformation("Card action: Function={Function}", chatEvent.Action.ActionMethodName);
 
         return await _actionController.HandleAsync(chatEvent.Action);
     }
@@ -78,6 +83,7 @@ public sealed class ChatEventHandler : IChatEventHandler
         catch (Exception ex)
         {
             _logger.LogError(ex, "LLM request failed");
+
             return "Sorry, I encountered an error while processing your message. Please try again.";
         }
     }

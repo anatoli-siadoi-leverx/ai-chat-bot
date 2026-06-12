@@ -13,6 +13,7 @@ public class DefaultWorker(ILogger<DefaultWorker> logger) : BackgroundService
             {
                 logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
             }
+
             await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
         }
     }

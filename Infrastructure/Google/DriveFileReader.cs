@@ -26,14 +26,14 @@ public sealed class DriveFileReader : IDriveFileReader
 {
     private const string GoogleDocMime = "application/vnd.google-apps.document";
 
-    private readonly DriveService            _drive;
-    private readonly ChatClient              _visionClient;
+    private readonly DriveService _drive;
+    private readonly ChatClient _visionClient;
     private readonly ILogger<DriveFileReader> _logger;
 
     public DriveFileReader(
         IOptions<GoogleCredentialOptions> googleOptions,
-        IOptions<OpenAiOptions>           openAiOptions,
-        ILogger<DriveFileReader>          logger)
+        IOptions<OpenAiOptions> openAiOptions,
+        ILogger<DriveFileReader> logger)
     {
         _logger = logger;
 
@@ -45,7 +45,7 @@ public sealed class DriveFileReader : IDriveFileReader
         _drive = new DriveService(new BaseClientService.Initializer
         {
             HttpClientInitializer = credential,
-            ApplicationName       = "AiChatBot-FileReader"
+            ApplicationName = "AiChatBot-FileReader"
         });
 
         // Vision client reuses the same model that is configured for the bot.
@@ -62,32 +62,39 @@ public sealed class DriveFileReader : IDriveFileReader
         try
         {
             if (mimeType == GoogleDocMime)
+            {
                 return await ExportAsTextAsync(fileId, ct);
+            }
 
             if (mimeType.StartsWith("text/", StringComparison.OrdinalIgnoreCase))
+            {
                 return await DownloadAsTextAsync(fileId, ct);
+            }
 
             if (mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            {
                 return await ExtractTextFromImageAsync(fileId, mimeType, fileName, ct);
+            }
 
-            _logger.LogInformation(
-                "File {FileId} ({MimeType}) — unsupported format, skipping", fileId, mimeType);
+            _logger.LogInformation("File {FileId} ({MimeType}) — unsupported format, skipping", fileId, mimeType);
+
             return string.Empty;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to read content of Drive file {FileId}", fileId);
+
             return string.Empty;
         }
     }
-
-    // ── Text helpers ──────────────────────────────────────────────────────────
 
     private async Task<string> ExportAsTextAsync(string fileId, CancellationToken ct)
     {
         var request = _drive.Files.Export(fileId, "text/plain");
         using var stream = new MemoryStream();
+
         await request.DownloadAsync(stream, ct);
+
         return System.Text.Encoding.UTF8.GetString(stream.ToArray());
     }
 
@@ -95,11 +102,11 @@ public sealed class DriveFileReader : IDriveFileReader
     {
         var request = _drive.Files.Get(fileId);
         using var stream = new MemoryStream();
+
         await request.DownloadAsync(stream, ct);
+
         return System.Text.Encoding.UTF8.GetString(stream.ToArray());
     }
-
-    // ── Vision OCR ────────────────────────────────────────────────────────────
 
     private async Task<string> ExtractTextFromImageAsync(
         string fileId, string mimeType, string fileName, CancellationToken ct)
@@ -108,12 +115,15 @@ public sealed class DriveFileReader : IDriveFileReader
 
         var request = _drive.Files.Get(fileId);
         using var stream = new MemoryStream();
+
         await request.DownloadAsync(stream, ct);
+
         var imageBytes = stream.ToArray();
 
         if (imageBytes.Length == 0)
         {
             _logger.LogWarning("Image {FileId} downloaded as empty; skipping Vision OCR", fileId);
+
             return string.Empty;
         }
 
@@ -134,6 +144,7 @@ public sealed class DriveFileReader : IDriveFileReader
         ];
 
         var completion = await _visionClient.CompleteChatAsync(messages, cancellationToken: ct);
+
         var text = completion.Value.Content.FirstOrDefault()?.Text ?? string.Empty;
 
         _logger.LogInformation(

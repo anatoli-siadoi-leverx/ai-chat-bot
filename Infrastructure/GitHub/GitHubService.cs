@@ -10,17 +10,17 @@ namespace Infrastructure.GitHub;
 /// </summary>
 public sealed class GitHubService : IGitHubService
 {
-    private readonly GitHubClient                _client;
-    private readonly GitHubOptions               _options;
-    private readonly ILogger<GitHubService>      _logger;
+    private readonly GitHubClient _client;
+    private readonly GitHubOptions _options;
+    private readonly ILogger<GitHubService> _logger;
 
     public GitHubService(
-        IOptions<GitHubOptions>      options,
-        ILogger<GitHubService>       logger)
+        IOptions<GitHubOptions> options,
+        ILogger<GitHubService> logger)
     {
         _options = options.Value;
-        _logger  = logger;
-        _client  = new GitHubClient(new ProductHeaderValue("AiChatBot"))
+        _logger = logger;
+        _client = new GitHubClient(new ProductHeaderValue("AiChatBot"))
         {
             Credentials = new Credentials(_options.Token)
         };
@@ -39,6 +39,7 @@ public sealed class GitHubService : IGitHubService
                     .GetAllContentsByRef(_options.Owner, _options.Repo, path, branch);
 
             var file = contents.FirstOrDefault();
+
             return file?.Content ?? "(binary or empty file)";
         }
         catch (NotFoundException)
@@ -48,6 +49,7 @@ public sealed class GitHubService : IGitHubService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to read GitHub file {Path}", path);
+
             return $"Error reading file: {ex.Message}";
         }
     }
@@ -65,7 +67,9 @@ public sealed class GitHubService : IGitHubService
             var result = await _client.Search.SearchCode(request);
 
             if (result.Items.Count == 0)
+            {
                 return "No matching files found.";
+            }
 
             var lines = result.Items
                 .Take(10)
@@ -76,6 +80,7 @@ public sealed class GitHubService : IGitHubService
         catch (Exception ex)
         {
             _logger.LogError(ex, "GitHub code search failed: {Query}", query);
+
             return $"Search error: {ex.Message}";
         }
     }
@@ -85,6 +90,7 @@ public sealed class GitHubService : IGitHubService
         string branchName, string? baseBranch = null, CancellationToken ct = default)
     {
         var @base = baseBranch ?? _options.DefaultBranch;
+
         try
         {
             var baseRef = await _client.Git.Reference.Get(
@@ -99,6 +105,7 @@ public sealed class GitHubService : IGitHubService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to create branch {Branch}", branchName);
+
             throw;
         }
     }
@@ -138,6 +145,7 @@ public sealed class GitHubService : IGitHubService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to commit {Path} to {Branch}", path, branch);
+
             throw;
         }
     }

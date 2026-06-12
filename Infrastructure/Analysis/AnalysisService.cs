@@ -16,24 +16,23 @@ namespace Infrastructure.Analysis;
 /// </summary>
 public sealed class AnalysisService : IAnalysisService
 {
-    private readonly ChatClient               _client;
-    private readonly ITool                    _repoTool;
-    private readonly ITool                    _searchTool;
+    private readonly ChatClient _client;
+    private readonly ITool _repoTool;
+    private readonly ITool _searchTool;
     private readonly ILogger<AnalysisService> _logger;
 
-    private const int MaxIterations = 8;
+    private const int MaxIterations = 5;
 
     public AnalysisService(
-        IOptions<OpenAiOptions>                              openAiOptions,
-        [FromKeyedServices("github_read_file")]   ITool      readFileTool,
-        [FromKeyedServices("github_search_code")] ITool      searchCodeTool,
-        ILogger<AnalysisService>                             logger)
+        IOptions<OpenAiOptions> openAiOptions,
+        [FromKeyedServices("github_read_file")] ITool readFileTool,
+        [FromKeyedServices("github_search_code")] ITool searchCodeTool,
+        ILogger<AnalysisService> logger)
     {
-        _client     = new OpenAIClient(openAiOptions.Value.ApiKey)
-                          .GetChatClient(openAiOptions.Value.Model);
-        _repoTool   = readFileTool;
+        _client = new OpenAIClient(openAiOptions.Value.ApiKey).GetChatClient(openAiOptions.Value.Model);
+        _repoTool = readFileTool;
         _searchTool = searchCodeTool;
-        _logger     = logger;
+        _logger = logger;
     }
 
     /// <inheritdoc/>
@@ -76,8 +75,6 @@ public sealed class AnalysisService : IAnalysisService
         }
     }
 
-    // ── Agent loop ────────────────────────────────────────────────────────────
-
     private async Task<string> RunLoopAsync(
         string systemPrompt, string userPrompt,
         IReadOnlyList<ITool> tools,
@@ -96,10 +93,12 @@ public sealed class AnalysisService : IAnalysisService
             _logger.LogDebug("Analysis iteration {I}/{Max}", i + 1, MaxIterations);
 
             var completion = await _client.CompleteChatAsync(messages, options, cancellationToken: ct);
-            var reason     = completion.Value.FinishReason;
+            var reason = completion.Value.FinishReason;
 
             if (reason == ChatFinishReason.Stop)
+            {
                 return completion.Value.Content[0].Text;
+            }
 
             if (reason == ChatFinishReason.ToolCalls)
             {
@@ -107,7 +106,7 @@ public sealed class AnalysisService : IAnalysisService
 
                 foreach (var call in completion.Value.ToolCalls)
                 {
-                    var tool   = tools.FirstOrDefault(t => t.Name == call.FunctionName);
+                    var tool = tools.FirstOrDefault(t => t.Name == call.FunctionName);
                     var result = tool is null
                         ? $"Unknown tool: {call.FunctionName}"
                         : await tool.ExecuteAsync(call.FunctionArguments.ToString());
@@ -123,15 +122,20 @@ public sealed class AnalysisService : IAnalysisService
         }
 
         _logger.LogWarning("Analysis hit max iterations ({Max})", MaxIterations);
+
         return "Analysis timed out — maximum tool-call iterations reached.";
     }
 
     private static ChatCompletionOptions BuildOptions(IReadOnlyList<ITool> tools)
     {
         var options = new ChatCompletionOptions();
+
         foreach (var t in tools)
+        {
             options.Tools.Add(ChatTool.CreateFunctionTool(
                 t.Name, t.Description, BinaryData.FromString(t.InputSchema)));
+        }
+
         return options;
     }
 }

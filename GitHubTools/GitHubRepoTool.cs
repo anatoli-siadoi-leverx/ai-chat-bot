@@ -14,13 +14,13 @@ public sealed class GitHubRepoTool : ITool
 
     public GitHubRepoTool(IGitHubService github) => _github = github;
 
-    public string Name        => "github_read_file";
+    public string Name => "github_read_file";
     public string Description => "Reads the full content of a file from the GitHub repository. Use this to inspect source code before analysing or fixing a bug.";
     public string InputSchema => """
         {
           "type": "object",
           "properties": {
-            "path":   { "type": "string", "description": "File path relative to repository root, e.g. 'src/Services/PaymentService.cs'" },
+            "path": { "type": "string", "description": "File path relative to repository root, e.g. 'src/Services/PaymentService.cs'" },
             "branch": { "type": "string", "description": "Branch name (optional, defaults to default branch)" }
           },
           "required": ["path"]
@@ -30,12 +30,14 @@ public sealed class GitHubRepoTool : ITool
     public async Task<string> ExecuteAsync(string input)
     {
         using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(input) ? "{}" : input);
-        var root      = doc.RootElement;
-        var path      = root.TryGetProperty("path",   out var p) ? p.GetString() ?? "" : "";
-        var branch    = root.TryGetProperty("branch", out var b) ? b.GetString()      : null;
+        var root = doc.RootElement;
+        var path = root.TryGetProperty("path", out var p) ? p.GetString() ?? "" : "";
+        var branch = root.TryGetProperty("branch", out var b) ? b.GetString() : null;
 
         if (string.IsNullOrEmpty(path))
+        {
             return "Error: 'path' is required.";
+        }
 
         return await _github.ReadFileAsync(path, branch);
     }

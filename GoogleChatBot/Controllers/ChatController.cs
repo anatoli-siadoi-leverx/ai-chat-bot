@@ -15,13 +15,13 @@ namespace GoogleChatBot.Controllers;
 public sealed class ChatController : ControllerBase
 {
     private readonly ILogger<ChatController> _logger;
-    private readonly IChatEventHandler       _handler;
+    private readonly IChatEventHandler _handler;
 
     public ChatController(
         ILogger<ChatController> logger,
-        IChatEventHandler       handler)
+        IChatEventHandler handler)
     {
-        _logger  = logger;
+        _logger = logger;
         _handler = handler;
     }
 
@@ -44,17 +44,15 @@ public sealed class ChatController : ControllerBase
 
         return chatEvent.Type switch
         {
-            "ADDED_TO_SPACE"     => Ok(ToApiResponse(_handler.OnAddedToSpace(chatEvent))),
-            "MESSAGE"            => Ok(ToApiResponse(await _handler.OnMessageAsync(chatEvent))),
+            "ADDED_TO_SPACE" => Ok(ToApiResponse(_handler.OnAddedToSpace(chatEvent))),
+            "MESSAGE" => Ok(ToApiResponse(await _handler.OnMessageAsync(chatEvent))),
             // CARD_CLICKED: update the original card in-place via UPDATE_MESSAGE.
             // Thread replies are posted proactively inside ActionController.
-            "CARD_CLICKED"       => Ok(ToCardClickedApiResponse(await _handler.OnCardClickedAsync(chatEvent))),
+            "CARD_CLICKED" => Ok(ToCardClickedApiResponse(await _handler.OnCardClickedAsync(chatEvent))),
             "REMOVED_FROM_SPACE" => Ok(new { }),
-            _                    => Ok(new { })
+            _ => Ok(new { })
         };
     }
-
-    // ── Wire-format converters ────────────────────────────────────────────────
 
     /// <summary>
     /// Converts a <see cref="BotResponse"/> to the Google Chat wire format
@@ -63,8 +61,8 @@ public sealed class ChatController : ControllerBase
     private static object ToApiResponse(BotResponse response) => response switch
     {
         BotResponse.TextOnly t => ChatResponse.From(t.Text),
-        BotResponse.Card     c => c.CardResponse,
-        _                      => ChatResponse.From(string.Empty)
+        BotResponse.Card c => c.CardResponse,
+        _ => ChatResponse.From(string.Empty)
     };
 
     /// <summary>
@@ -80,12 +78,12 @@ public sealed class ChatController : ControllerBase
         BotResponse.Card c => new
         {
             actionResponse = new { type = "UPDATE_MESSAGE" },
-            cardsV2        = c.CardResponse.CardsV2
+            cardsV2 = c.CardResponse.CardsV2
         },
         BotResponse.TextOnly t => new
         {
             actionResponse = new { type = "NEW_MESSAGE" },
-            text           = t.Text
+            text = t.Text
         },
         _ => new { actionResponse = new { type = "UPDATE_MESSAGE" } }
     };

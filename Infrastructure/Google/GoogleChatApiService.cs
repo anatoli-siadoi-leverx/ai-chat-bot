@@ -17,11 +17,11 @@ namespace Infrastructure.Google;
 public sealed class GoogleChatApiService : IGoogleChatApiService
 {
     private const string ChatApiBase = "https://chat.googleapis.com/v1";
-    private const string ChatScope   = "https://www.googleapis.com/auth/chat.bot";
+    private const string ChatScope = "https://www.googleapis.com/auth/chat.bot";
 
-    private readonly HttpClient                        _http;
-    private readonly GoogleCredential                  _credential;
-    private readonly ILogger<GoogleChatApiService>     _logger;
+    private readonly HttpClient _http;
+    private readonly GoogleCredential _credential;
+    private readonly ILogger<GoogleChatApiService> _logger;
 
     private static readonly JsonSerializerOptions _jsonOpts = new()
     {
@@ -30,7 +30,7 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
 
     public GoogleChatApiService(
         IOptions<GoogleCredentialOptions> options,
-        ILogger<GoogleChatApiService>     logger)
+        ILogger<GoogleChatApiService> logger)
     {
         _logger = logger;
         _http = new HttpClient();
@@ -51,11 +51,11 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
                 new
                 {
                     cardId = "ticket-notification",
-                    card   = new
+                    card = new
                     {
                         header = new
                         {
-                            title    = $"New bug report: {fileName}",
+                            title = $"New bug report: {fileName}",
                             subtitle = description
                         }
                     }
@@ -64,6 +64,7 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
         };
 
         var response = await PostAsync(spaceName, body, threadName: null, ct);
+
         return ParseChatPostResult(response);
     }
 
@@ -84,7 +85,7 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
                 new
                 {
                     cardId = "file-content",
-                    card   = new
+                    card = new
                     {
                         sections = new[]
                         {
@@ -146,8 +147,6 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
         CancellationToken ct = default)
         => PostAsync(spaceName, body, threadName, ct);
 
-    // ── Private helpers ───────────────────────────────────────────────────────
-
     private async Task<string> PostAsync(
         string spaceName, object body, string? threadName, CancellationToken ct)
     {
@@ -182,6 +181,7 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
         }
 
         _logger.LogDebug("Chat API response: {Body}", responseBody);
+
         return responseBody;
     }
 
@@ -191,18 +191,20 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
     /// </summary>
     private static object MergeThread(object body, string threadName)
     {
-        var node   = JsonNode.Parse(JsonSerializer.Serialize(body, _jsonOpts))!.AsObject();
+        var node = JsonNode.Parse(JsonSerializer.Serialize(body, _jsonOpts))!.AsObject();
         node["thread"] = JsonNode.Parse(JsonSerializer.Serialize(new { name = threadName }));
+
         return node;
     }
 
     private static ChatPostResult ParseChatPostResult(string json)
     {
-        using var doc    = JsonDocument.Parse(json);
-        var root         = doc.RootElement;
-        var messageName  = root.TryGetProperty("name",   out var n) ? n.GetString() ?? string.Empty : string.Empty;
-        var threadName   = root.TryGetProperty("thread", out var t)
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        var messageName = root.TryGetProperty("name", out var n) ? n.GetString() ?? string.Empty : string.Empty;
+        var threadName = root.TryGetProperty("thread", out var t)
             && t.TryGetProperty("name", out var tn) ? tn.GetString() ?? string.Empty : string.Empty;
+
         return new ChatPostResult(messageName, threadName);
     }
 

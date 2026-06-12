@@ -9,7 +9,7 @@ public sealed class HelpCommand : ICommand
 {
     private readonly IReadOnlyList<ICommand> _commands;
 
-    public string Name        => "help";
+    public string Name => "help";
     public string Description => "Shows all available commands";
 
     public HelpCommand(IReadOnlyList<ICommand> commands)
@@ -29,7 +29,6 @@ public sealed class HelpCommand : ICommand
             .OrderBy(c => c.Name)
             .Select(c => $"• `/{c.Name}` — {c.Description}");
 
-        return Task.FromResult(
-            BotResponse.FromText("*Available commands:*\n" + string.Join("\n", lines)));
+        return Task.FromResult(BotResponse.FromText("*Available commands:*\n" + string.Join("\n", lines)));
     }
 }
