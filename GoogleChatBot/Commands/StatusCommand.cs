@@ -1,4 +1,5 @@
 using Domain.Repositories;
+using GoogleChatBot.Models.Incoming;
 using GoogleChatBot.Models.Outgoing;
 
 namespace GoogleChatBot.Commands;
@@ -19,7 +20,7 @@ public sealed class StatusCommand : ICommand
         => input.Equals("/status", StringComparison.OrdinalIgnoreCase) ||
            input.StartsWith("/status ", StringComparison.OrdinalIgnoreCase);
 
-    public async Task<BotResponse> ExecuteAsync(string input)
+    public async Task<BotResponse> ExecuteAsync(ChatMessage message)
     {
         var tickets = await _repo.GetAllAsync();
 
@@ -28,10 +29,8 @@ public sealed class StatusCommand : ICommand
             return BotResponse.FromText("No tickets found. Use `/ticket <description>` to create one.");
         }
 
-        var lines = tickets.Select(t =>
-            $"• `{t.Id:D}` — **{t.Title}** | State: `{t.State}` | {t.CreatedAt:yyyy-MM-dd HH:mm} UTC");
+        var lines = tickets.Select(t => $"• `{t.Id:D}` — **{t.Title}** | State: `{t.State}` | {t.CreatedAt:yyyy-MM-dd HH:mm} UTC");
 
-        return BotResponse.FromText(
-            $"*Error Tickets ({tickets.Count} total):*\n" + string.Join("\n", lines));
+        return BotResponse.FromText($"*Error Tickets ({tickets.Count} total):*\n" + string.Join("\n", lines));
     }
 }

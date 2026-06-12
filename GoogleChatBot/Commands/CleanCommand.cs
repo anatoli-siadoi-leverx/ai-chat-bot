@@ -1,4 +1,5 @@
 using Domain.Repositories;
+using GoogleChatBot.Models.Incoming;
 using GoogleChatBot.Models.Outgoing;
 
 namespace GoogleChatBot.Commands;
@@ -14,9 +15,9 @@ public sealed class CleanCommand(ITicketRepository repo) : ICommand
     public bool CanHandle(string input)
         => input.Equals("/clean", StringComparison.OrdinalIgnoreCase);
 
-    public async Task<BotResponse> ExecuteAsync(string input)
+    public async Task<BotResponse> ExecuteAsync(ChatMessage message)
     {
-        var all = await repo.GetAllAsync();
+        var all   = await repo.GetAllAsync();
 
         var count = all.Count;
 

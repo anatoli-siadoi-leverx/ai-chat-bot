@@ -1,10 +1,10 @@
+using GoogleChatBot.Models.Incoming;
 using GoogleChatBot.Models.Outgoing;
 
 namespace GoogleChatBot.Commands;
 
 /// <summary>
-/// A single slash-command handler. Commands are the UI layer:
-/// they parse user input and delegate business logic to <c>Tools</c>.
+/// A single slash-command handler.
 /// </summary>
 public interface ICommand
 {
@@ -14,16 +14,13 @@ public interface ICommand
     /// <summary>One-line description shown in /help output.</summary>
     string Description { get; }
 
-    /// <summary>
-    /// Returns true when this command can handle the given input.
-    /// <paramref name="input"/> is already trimmed.
-    /// </summary>
+    /// <summary>Returns true when this command can handle the given input text.</summary>
     bool CanHandle(string input);
 
     /// <summary>
-    /// Executes the command and returns a <see cref="BotResponse"/> —
-    /// either plain text or a rich card.
-    /// Async because commands delegate to Tools, which may perform I/O.
+    /// Executes the command. The full <see cref="ChatMessage"/> is provided so commands
+    /// can inspect both the text (<c>message.Text</c>) and any file attachments
+    /// (<c>message.Attachments</c>).
     /// </summary>
-    Task<BotResponse> ExecuteAsync(string input);
+    Task<BotResponse> ExecuteAsync(ChatMessage message);
 }

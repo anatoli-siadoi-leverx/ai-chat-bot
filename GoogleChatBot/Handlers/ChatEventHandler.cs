@@ -32,6 +32,7 @@ public sealed class ChatEventHandler : IChatEventHandler
     public BotResponse OnAddedToSpace(ChatEvent chatEvent)
     {
         var spaceLabel = chatEvent.Space?.Type == "DM" ? "a DM" : "this space";
+
         return BotResponse.FromText(
             $"Hello! I'm your AI assistant. I was just added to {spaceLabel}. " +
             "Type `/help` to see my commands, or just ask me anything.");
@@ -39,11 +40,12 @@ public sealed class ChatEventHandler : IChatEventHandler
 
     public async Task<BotResponse> OnMessageAsync(ChatEvent chatEvent)
     {
-        var text = chatEvent.Message?.Text?.Trim() ?? string.Empty;
-        var sender = chatEvent.Message?.Sender?.DisplayName ?? "Unknown";
+        var message = chatEvent.Message ?? new ChatMessage();
+        var text    = message.Text?.Trim() ?? string.Empty;
+        var sender  = message.Sender?.DisplayName ?? "Unknown";
 
         // 1. Slash-commands have priority.
-        var commandResult = await _dispatcher.DispatchAsync(text);
+        var commandResult = await _dispatcher.DispatchAsync(message);
 
         if (commandResult is not null)
         {

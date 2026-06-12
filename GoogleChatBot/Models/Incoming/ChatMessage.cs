@@ -15,4 +15,14 @@ public sealed class ChatMessage
 
     [JsonPropertyName("sender")]
     public ChatSender? Sender { get; set; }
+
+    /// <summary>
+    /// Files attached to this message.
+    /// Each entry is either a Drive file (<see cref="ChatAttachment.DriveDataRef"/> set)
+    /// or an uploaded file (<see cref="ChatAttachment.AttachmentDataRef"/> set).
+    /// Google Chat uses the JSON key "attachment" (singular) for this array.
+    /// </summary>
+    [JsonPropertyName("attachment")]
+    public List<ChatAttachment>? Attachments { get; set; }
 }
+

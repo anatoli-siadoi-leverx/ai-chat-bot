@@ -1,9 +1,10 @@
+using GoogleChatBot.Models.Incoming;
 using GoogleChatBot.Models.Outgoing;
 
 namespace GoogleChatBot.Commands;
 
 /// <summary>
-/// Routes incoming message text to the matching <see cref="ICommand"/>.
+/// Routes incoming messages to the matching <see cref="ICommand"/>.
 /// </summary>
 public sealed class CommandDispatcher
 {
@@ -15,18 +16,17 @@ public sealed class CommandDispatcher
         ILogger<CommandDispatcher> logger)
     {
         _commands = commands.ToList();
-        _logger   = logger;
+        _logger = logger;
     }
 
     /// <summary>
-    /// Tries to dispatch <paramref name="input"/> to a registered command.
+    /// Tries to dispatch the message to a registered command.
+    /// Returns <c>null</c> when the message text does not start with <c>/</c>.
     /// </summary>
-    /// <returns>
-    /// The command's <see cref="BotResponse"/>, an "unknown command" text response,
-    /// or <c>null</c> when the input does not start with <c>/</c>.
-    /// </returns>
-    public async Task<BotResponse?> DispatchAsync(string input)
+    public async Task<BotResponse?> DispatchAsync(ChatMessage message)
     {
+        var input = message.Text?.Trim() ?? string.Empty;
+
         if (string.IsNullOrWhiteSpace(input) || input[0] != '/')
         {
             return null;
@@ -44,6 +44,6 @@ public sealed class CommandDispatcher
 
         _logger.LogInformation("Dispatching command /{Command}", command.Name);
 
-        return await command.ExecuteAsync(input);
+        return await command.ExecuteAsync(message);
     }
 }

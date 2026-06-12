@@ -1,4 +1,5 @@
 using GoogleChatBot.Cards;
+using GoogleChatBot.Models.Incoming;
 using GoogleChatBot.Models.Outgoing;
 using Infrastructure.Google;
 using Microsoft.Extensions.Options;
@@ -19,15 +20,13 @@ public sealed class ReportCommand(
     public bool CanHandle(string input)
         => input.Equals("/report", StringComparison.OrdinalIgnoreCase);
 
-    public async Task<BotResponse> ExecuteAsync(string input)
+    public async Task<BotResponse> ExecuteAsync(ChatMessage message)
     {
         var o = opts.Value;
 
-        // Fetch all three folder counts in parallel
         var t1 = SafeCountAsync(o.NewFolderId);
         var t2 = SafeCountAsync(o.InProcessFolderId);
         var t3 = SafeCountAsync(o.DoneFolderId);
-
         await Task.WhenAll(t1, t2, t3);
 
         var newCount = t1.Result;
@@ -38,8 +37,6 @@ public sealed class ReportCommand(
         var resolved = doneCount;
         var total = active + resolved;
 
-        // Build the coloured stats lines.
-        // Google Chat TextParagraph supports <font color="...">, <b>, <br>.
         var statsHtml =
             $"<font color=\"#F9AB00\"><b>●</b></font>  <b>NEW</b>         <b>{FormatCount(newCount)}</b><br>" +
             $"<font color=\"#EA4335\"><b>●</b></font>  <b>IN PROCESS</b>  <b>{FormatCount(inProcessCount)}</b><br>" +
@@ -73,7 +70,7 @@ public sealed class ReportCommand(
         }
         catch
         {
-            return -1;   // -1 signals the folder was inaccessible
+            return -1;
         }
     }
 

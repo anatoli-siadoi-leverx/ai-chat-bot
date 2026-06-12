@@ -50,6 +50,7 @@ builder.Services.Configure<GoogleCredentialOptions>(
     builder.Configuration.GetSection(GoogleCredentialOptions.SectionName));
 builder.Services.AddSingleton<IGoogleChatApiService, GoogleChatApiService>();
 builder.Services.AddSingleton<IGoogleDriveService, GoogleDriveService>();
+builder.Services.AddSingleton<IDriveFileReader, DriveFileReader>();
 
 builder.Services.Configure<GitHubOptions>(
     builder.Configuration.GetSection(GitHubOptions.SectionName));
@@ -69,10 +70,7 @@ builder.Services.AddSingleton<IFixService, FixService>();
 builder.Services.AddSingleton<ITicketThreadNotifier, TicketThreadNotifier>();
 builder.Services.AddSingleton<ITicketPipelineRunner, TicketPipelineRunner>();
 
-builder.Services.AddSingleton<TicketCommand>(sp =>
-    new TicketCommand(
-        sp.GetRequiredService<ITicketRepository>(),
-        sp.GetRequiredService<TicketWorkflow>()));
+builder.Services.AddSingleton<TicketCommand>();
 
 builder.Services.AddSingleton<StatusCommand>(sp =>
     new StatusCommand(sp.GetRequiredService<ITicketRepository>()));
@@ -100,7 +98,6 @@ builder.Services.AddSingleton<ICommand>(sp => sp.GetRequiredService<HelpCommand>
 
 builder.Services.AddSingleton<CommandDispatcher>();
 
-// ── Card action handler ───────────────────────────────────────────────────────
 builder.Services.AddSingleton<ActionController>();
 
 builder.Services.AddSingleton<IChatEventHandler, ChatEventHandler>();
