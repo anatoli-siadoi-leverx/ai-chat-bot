@@ -3,8 +3,6 @@ using Infrastructure.Google;
 using Infrastructure.OpenAi;
 using Infrastructure.Persistence;
 using Infrastructure.Repositories;
-using Tools;
-using Tools.Abstractions;
 using Worker;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -14,22 +12,13 @@ builder.Services.Configure<GoogleCredentialOptions>(
     builder.Configuration.GetSection(GoogleCredentialOptions.SectionName));
 
 builder.Services.AddSingleton<IGoogleDriveService, GoogleDriveService>();
+builder.Services.AddSingleton<IDriveFileReader, DriveFileReader>();
 builder.Services.AddSingleton<IGoogleChatApiService, GoogleChatApiService>();
 
-// ── OpenAI (for LLM description generation) ──────────────────────────────────
-// API key: dotnet user-secrets set "OpenAi:ApiKey" "sk-..."
+// ── OpenAI (single-turn description generation — no tool-calling needed) ──────
 builder.Services.Configure<OpenAiOptions>(
     builder.Configuration.GetSection(OpenAiOptions.SectionName));
-
-// Worker uses the simple single-turn service (no tool-calling loop needed here)
 builder.Services.AddSingleton<ILlmService, OpenAiService>();
-
-// ── Tools (required by AgentService if switched later) ───────────────────────
-builder.Services.AddSingleton<HelloTool>();
-builder.Services.AddSingleton<TimeTool>();
-builder.Services.AddSingleton<ITool>(sp => sp.GetRequiredService<HelloTool>());
-builder.Services.AddSingleton<ITool>(sp => sp.GetRequiredService<TimeTool>());
-builder.Services.AddSingleton<ToolRegistry>();
 
 // ── Ticket repository (SQLite — shared with GoogleChatBot) ───────────────────
 var ticketsConn = builder.Configuration.GetConnectionString("Tickets")

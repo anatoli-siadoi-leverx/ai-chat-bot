@@ -11,10 +11,11 @@ namespace Worker;
 /// <para>
 /// For each new file found it:
 /// <list type="number">
-///   <item>Reads the file content (text files and Google Docs; images are Stage 10).</item>
+///   <item>Reads the file content via <see cref="IDriveFileReader"/> (text, Google Docs, or Vision OCR for images).</item>
 ///   <item>Generates a one-sentence description using the LLM.</item>
 ///   <item>Creates an <see cref="ErrorTicket"/> with state <see cref="TicketState.New"/>.</item>
-///   <item>Posts a notification card + thread reply to the configured Google Chat space.</item>
+///   <item>Posts a notification card (header only) to the configured Google Chat space.</item>
+///   <item>Posts a thread card with the file content and an Analyze button.</item>
 ///   <item>Saves <c>MessageName</c> and <c>ThreadName</c> on the ticket.</item>
 ///   <item>Moves the file from <c>New/</c> to <c>InProcess/</c>.</item>
 /// </list>
@@ -24,27 +25,30 @@ namespace Worker;
 /// </summary>
 public sealed class GoogleDriveWatcherWorker : BackgroundService
 {
-    private readonly IGoogleDriveService              _drive;
-    private readonly IGoogleChatApiService            _chat;
-    private readonly ILlmService                      _llm;
-    private readonly ITicketRepository                _tickets;
-    private readonly GoogleCredentialOptions          _options;
+    private readonly IGoogleDriveService               _drive;
+    private readonly IDriveFileReader                  _fileReader;
+    private readonly IGoogleChatApiService             _chat;
+    private readonly ILlmService                       _llm;
+    private readonly ITicketRepository                 _tickets;
+    private readonly GoogleCredentialOptions           _options;
     private readonly ILogger<GoogleDriveWatcherWorker> _logger;
 
     public GoogleDriveWatcherWorker(
         IGoogleDriveService               drive,
+        IDriveFileReader                  fileReader,
         IGoogleChatApiService             chat,
         ILlmService                       llm,
         ITicketRepository                 tickets,
         IOptions<GoogleCredentialOptions> options,
         ILogger<GoogleDriveWatcherWorker> logger)
     {
-        _drive   = drive;
-        _chat    = chat;
-        _llm     = llm;
-        _tickets = tickets;
-        _options = options.Value;
-        _logger  = logger;
+        _drive      = drive;
+        _fileReader = fileReader;
+        _chat       = chat;
+        _llm        = llm;
+        _tickets    = tickets;
+        _options    = options.Value;
+        _logger     = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -105,8 +109,8 @@ public sealed class GoogleDriveWatcherWorker : BackgroundService
     {
         _logger.LogInformation("Processing Drive file {FileId} ({Name})", file.Id, file.Name);
 
-        // 1. Read file content (best-effort; images return empty string until Stage 10)
-        var content = await _drive.ReadTextContentAsync(file.Id, file.MimeType, ct);
+        // 1. Read file content (text, Google Doc, or image OCR via Vision API)
+        var content = await _fileReader.ReadAsync(file.Id, file.MimeType, file.Name, ct);
 
         // 2. Generate a short description via LLM
         var description = await GenerateDescriptionAsync(file.Name, content, ct);

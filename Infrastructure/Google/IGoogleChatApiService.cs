@@ -53,7 +53,7 @@ public interface IGoogleChatApiService
 
     /// <summary>
     /// Posts a plain-text reply inside an existing thread.
-    /// Used for status updates, analysis results, and PR links.
+    /// Used for status updates, analysis results, and branch notifications.
     /// </summary>
     /// <param name="spaceName">Target space, e.g. "spaces/XXXXXXXXX".</param>
     /// <param name="threadName">Thread to reply to, e.g. "spaces/xxx/threads/zzz".</param>
@@ -61,5 +61,22 @@ public interface IGoogleChatApiService
     /// <param name="ct">Cancellation token.</param>
     Task PostThreadReplyAsync(
         string spaceName, string threadName, string text,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Posts an arbitrary message body as a thread reply.
+    /// Use this to post a card (e.g. a serialisable <c>CardResponse</c>) after
+    /// an asynchronous operation completes, so the thread always shows the
+    /// current ticket state with the correct action buttons.
+    /// </summary>
+    /// <param name="spaceName">Target space, e.g. "spaces/XXXXXXXXX".</param>
+    /// <param name="threadName">Thread to reply to, e.g. "spaces/xxx/threads/zzz".</param>
+    /// <param name="body">
+    /// Any serialisable object. Pass a <c>CardResponse</c> instance to post a card,
+    /// or an anonymous object with a <c>text</c> property for plain text.
+    /// </param>
+    /// <param name="ct">Cancellation token.</param>
+    Task PostThreadMessageAsync(
+        string spaceName, string threadName, object body,
         CancellationToken ct = default);
 }

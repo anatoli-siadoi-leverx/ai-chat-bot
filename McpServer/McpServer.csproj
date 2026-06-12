@@ -9,6 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\GitHubTools\GitHubTools.csproj" />
+    <ProjectReference Include="..\Infrastructure\Infrastructure.csproj" />
     <ProjectReference Include="..\Tools\Tools.csproj" />
   </ItemGroup>
 

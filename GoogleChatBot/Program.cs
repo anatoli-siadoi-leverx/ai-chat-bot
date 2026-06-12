@@ -1,8 +1,12 @@
 using Domain.Repositories;
 using Domain.Workflow;
+using GitHubTools;
 using GoogleChatBot.Commands;
 using GoogleChatBot.Controllers;
 using GoogleChatBot.Handlers;
+using Infrastructure.Analysis;
+using Infrastructure.Fix;
+using Infrastructure.GitHub;
 using Infrastructure.Google;
 using Infrastructure.OpenAi;
 using Infrastructure.Persistence;
@@ -30,25 +34,15 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 // ── LLM ───────────────────────────────────────────────────────────────────────
-// API key: dotnet user-secrets set "OpenAi:ApiKey" "sk-..."
-// Or set environment variable: OpenAi__ApiKey=sk-...
 builder.Services.Configure<OpenAiOptions>(
     builder.Configuration.GetSection(OpenAiOptions.SectionName));
 
-// Stage 5: AgentService wraps the OpenAI chat loop with tool-calling support.
-// To revert to simple completion (no tools), swap back to OpenAiService.
 builder.Services.AddSingleton<ILlmService, AgentService>();
 
-// ── Tools ─────────────────────────────────────────────────────────────────────
-builder.Services.AddSingleton<HelloTool>();
-builder.Services.AddSingleton<TimeTool>();
-
-builder.Services.AddSingleton<ITool>(sp => sp.GetRequiredService<HelloTool>());
-builder.Services.AddSingleton<ITool>(sp => sp.GetRequiredService<TimeTool>());
-
+// ── ToolRegistry (empty — AgentService degrades to plain LLM completion) ─────
 builder.Services.AddSingleton<ToolRegistry>();
 
-// ── Stage 9b: Ticket Repository (SQLite — shared with Worker) ────────────────
+// ── Ticket Repository (SQLite — shared with Worker) ──────────────────────────
 var ticketsConn = builder.Configuration.GetConnectionString("Tickets")
     ?? "Data Source=tickets.db";
 builder.Services.AddSqliteTickets(ticketsConn);
@@ -59,13 +53,23 @@ builder.Services.Configure<GoogleCredentialOptions>(
     builder.Configuration.GetSection(GoogleCredentialOptions.SectionName));
 builder.Services.AddSingleton<IGoogleChatApiService, GoogleChatApiService>();
 
+// ── GitHub services ───────────────────────────────────────────────────────────
+builder.Services.Configure<GitHubOptions>(
+    builder.Configuration.GetSection(GitHubOptions.SectionName));
+builder.Services.AddSingleton<IGitHubService, GitHubService>();
+
+// GitHub tools — registered as keyed ITool so AnalysisService + FixService can
+// request them via [FromKeyedServices].  Intentionally NOT registered as plain
+// ITool so ToolRegistry (general chat) stays empty.
+builder.Services.AddKeyedSingleton<ITool, GitHubRepoTool>("github_read_file");
+builder.Services.AddKeyedSingleton<ITool, GitHubSearchTool>("github_search_code");
+builder.Services.AddKeyedSingleton<ITool, CommitFileTool>("github_commit_file");
+
+// LLM pipeline services
+builder.Services.AddSingleton<IAnalysisService, AnalysisService>();
+builder.Services.AddSingleton<IFixService, FixService>();
+
 // ── Commands ──────────────────────────────────────────────────────────────────
-builder.Services.AddSingleton<HelloCommand>(sp =>
-    new HelloCommand(sp.GetRequiredService<HelloTool>()));
-
-builder.Services.AddSingleton<TimeCommand>(sp =>
-    new TimeCommand(sp.GetRequiredService<TimeTool>()));
-
 builder.Services.AddSingleton<TicketCommand>(sp =>
     new TicketCommand(
         sp.GetRequiredService<ITicketRepository>(),
@@ -75,22 +79,24 @@ builder.Services.AddSingleton<StatusCommand>(sp =>
     new StatusCommand(sp.GetRequiredService<ITicketRepository>()));
 
 builder.Services.AddSingleton<HelpCommand>(sp => new HelpCommand([
-    sp.GetRequiredService<HelloCommand>(),
-    sp.GetRequiredService<TimeCommand>(),
     sp.GetRequiredService<TicketCommand>(),
     sp.GetRequiredService<StatusCommand>(),
 ]));
 
-builder.Services.AddSingleton<ICommand>(sp => sp.GetRequiredService<HelloCommand>());
-builder.Services.AddSingleton<ICommand>(sp => sp.GetRequiredService<TimeCommand>());
 builder.Services.AddSingleton<ICommand>(sp => sp.GetRequiredService<TicketCommand>());
 builder.Services.AddSingleton<ICommand>(sp => sp.GetRequiredService<StatusCommand>());
 builder.Services.AddSingleton<ICommand>(sp => sp.GetRequiredService<HelpCommand>());
 
 builder.Services.AddSingleton<CommandDispatcher>();
 
-// ── Stage 8: Card action handler ──────────────────────────────────────────────
-builder.Services.AddSingleton<ActionController>();
+// ── Card action handler ───────────────────────────────────────────────────────
+builder.Services.AddSingleton<ActionController>(sp => new ActionController(
+    sp.GetRequiredService<ITicketRepository>(),
+    sp.GetRequiredService<TicketWorkflow>(),
+    sp.GetRequiredService<IGoogleChatApiService>(),
+    sp.GetRequiredService<IAnalysisService>(),
+    sp.GetRequiredService<IFixService>(),
+    sp.GetRequiredService<ILogger<ActionController>>()));
 
 // ── Event handler ─────────────────────────────────────────────────────────────
 builder.Services.AddSingleton<IChatEventHandler, ChatEventHandler>();

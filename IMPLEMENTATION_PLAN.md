@@ -1,5 +1,8 @@
 # AI Chat Bot — Implementation Plan
 
+> **Architecture overview:** see [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design,
+> dependency graph, data-flow diagrams, and configuration reference.
+
 ## Architecture Overview
 
 **Solution:** `AiChatBotSolution.slnx` | **Target:** net10.0
@@ -490,7 +493,7 @@ Bot never opens a PR without explicit human approval in the thread.
 | 8 | Google Chat Cards (Buttons) | ✅ Done |
 | 9 | Google Drive Watcher + Chat Notification | ✅ Done |
 | 9b | Persistent Ticket Repository (SQLite) | ✅ Done |
-| 10 | Google Drive File Reading | ⬜ Planned |
-| 11 | Repository Analysis | ⬜ Planned |
-| 12 | Fix Pipeline (Branch / Commit / PR) | ⬜ Planned |
-| 13 | Human-in-the-Loop | ⬜ Planned |
+| 10 | Google Drive File Reading | ✅ Done |
+| 11 | Repository Analysis | ✅ Done |
+| 12 | Fix Pipeline (Branch / Commit — no PR) | ✅ Done |
+| 13 | Human-in-the-Loop | 🚫 Superseded (no PR → no approval gate needed) |

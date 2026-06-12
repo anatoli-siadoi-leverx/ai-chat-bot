@@ -1,5 +1,8 @@
 # AI Chat Bot — Implementation Plan
 
+> **Architecture overview:** see [`ARCHITECTURE.md`](../../ARCHITECTURE.md) for the full system design,
+> dependency graph, data-flow diagrams, and configuration reference.
+
 ## Overview
 
 Solution: `AiChatBotSolution.slnx`, target framework: **net10.0**
@@ -303,40 +306,36 @@ WAL mode is enabled for concurrent multi-process access (Worker writes, GoogleCh
 
 ---
 
-### Stage 12 — Fix Pipeline (Branch / Commit / PR)
-**Goal:** When user clicks "Fix", the AI creates a branch, commits the fix, and opens a Pull Request; the PR link is posted as a thread reply.
+### Stage 12 — Fix Pipeline (Branch / Commit)
+**Goal:** When user clicks "Fix", the AI creates a branch, commits the patch, and posts the branch name as a thread reply. No PR is opened — the team reviews and merges manually.
 
 **Trigger:** `CARD_CLICKED` → `ActionMethodName = "fix"` → ticket `Analyzed → Fixing`
 
 **Fix flow:**
-1. `AgentService` runs with fix tools: reads code, generates patch, commits to new branch, opens PR
-2. `ErrorTicket.BranchName` and `ErrorTicket.PullRequestUrl` are saved
-3. `GoogleChatApiService` posts PR link as thread reply
+1. `AgentService` runs with fix tools: reads relevant files, generates patch, creates branch, commits changes
+2. `ErrorTicket.BranchName` is saved (e.g. `fix/ticket-{shortId}-{slug}`)
+3. Thread reply posted: `🔧 Fix committed to branch \`fix/abc123-null-reference-payment\`. Review and merge when ready.`
 4. Ticket transitions `Fixing → Fixed`; card updated with "Close" button
+
+**Rationale:** No PR is created automatically — the merge decision is left entirely to the developer. The branch name in the thread is sufficient signal to start the review.
+
+**Domain change:**
+- `ErrorTicket.BranchName` (`string?`) — branch where fix was committed
 
 **Files:**
 - `Tools/Git/CreateBranchTool.cs` — creates branch from base ref
 - `Tools/Git/CommitFileTool.cs` — creates or updates a file on a branch
-- `Tools/Git/CreatePullRequestTool.cs` — opens PR with title/body
-- `Infrastructure/GitHub/GitHubService.cs` — wraps Octokit for branch/commit/PR operations
+- `Infrastructure/GitHub/GitHubService.cs` — wraps Octokit for branch/commit operations (no PR methods)
+- `Infrastructure/GitHub/GitHubOptions.cs` — `Owner`, `Repo`, `Token`, `DefaultBranch`
 
-**Result:** Full automated fix pipeline; PR link visible in the bug-report thread.
+**Package:** `Octokit`
+
+**Result:** Fix is committed to a dedicated branch; branch name appears in the bug-report thread; developers review and merge at their own pace.
 
 ---
 
-### Stage 13 — Human-in-the-Loop
-**Goal:** Before opening a PR the bot asks for human approval in the thread; pipeline resumes only on explicit Approve.
+### Stage 13 — ~~Human-in-the-Loop~~ (Superseded)
 
-**Approval flow:**
-1. Bot posts thread reply: "Ready to open PR — Approve / Reject" (card with two buttons)
-2. User clicks Approve → `CARD_CLICKED` → `ActionController` resolves the pending approval
-3. PR is opened; link posted in thread
-4. On Reject → ticket transitions back to `Analyzed`; user can adjust and retry
-
-**Files:**
-- `Domain/Approvals/ApprovalRequest.cs` — `Id`, `TicketId`, `Description`, `State`
-- `Domain/Approvals/ApprovalState.cs` — enum: `Pending`, `Approved`, `Rejected`
-- `Infrastructure/Approvals/InMemoryApprovalStore.cs` — `TaskCompletionSource<ApprovalState>` per request
-- `GoogleChatBot/Controllers/ActionController.cs` — extended to resolve approvals
-
-**Result:** Bot never opens a PR without explicit human approval in the thread.
+> **Removed.** Stage 13 was an approval gate before auto-opening a PR.
+> Since Stage 12 no longer opens PRs automatically, this gate is not needed —
+> the manual merge is the human review step.

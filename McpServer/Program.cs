@@ -1,3 +1,6 @@
+using GitHubTools;
+using Infrastructure.GitHub;
+using Infrastructure.OpenAi;
 using Tools;
 using Tools.Abstractions;
 
@@ -16,20 +19,27 @@ builder.Services.AddSwaggerGen(options =>
         Description = "HTTP API for listing and calling AI tools via the Model Context Protocol."
     });
 
-    // Include XML doc comments (<summary> on controllers and DTOs)
     var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     options.IncludeXmlComments(xmlPath);
 });
 
-// ── Tools ─────────────────────────────────────────────────────────────────────
-builder.Services.AddSingleton<HelloTool>();
-builder.Services.AddSingleton<TimeTool>();
+// ── GitHub services ───────────────────────────────────────────────────────────
+builder.Services.Configure<GitHubOptions>(
+    builder.Configuration.GetSection(GitHubOptions.SectionName));
+builder.Services.AddSingleton<IGitHubService, GitHubService>();
 
-builder.Services.AddSingleton<ITool>(sp => sp.GetRequiredService<HelloTool>());
-builder.Services.AddSingleton<ITool>(sp => sp.GetRequiredService<TimeTool>());
+// ── GitHub tools — registered as plain ITool for ToolRegistry ────────────────
+// McpServer exposes these to external MCP clients via GET /mcp/tools.
+builder.Services.AddSingleton<ITool, GitHubRepoTool>();
+builder.Services.AddSingleton<ITool, GitHubSearchTool>();
+builder.Services.AddSingleton<ITool, CommitFileTool>();
 
 builder.Services.AddSingleton<ToolRegistry>();
+
+// ── OpenAI (only needed if McpServer hosts an agent in the future) ────────────
+builder.Services.Configure<OpenAiOptions>(
+    builder.Configuration.GetSection(OpenAiOptions.SectionName));
 
 // ─────────────────────────────────────────────────────────────────────────────
 

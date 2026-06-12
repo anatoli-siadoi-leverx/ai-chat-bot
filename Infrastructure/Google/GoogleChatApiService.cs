@@ -140,6 +140,12 @@ public sealed class GoogleChatApiService : IGoogleChatApiService
         await PostAsync(spaceName, body, threadName, ct);
     }
 
+    /// <inheritdoc/>
+    public Task PostThreadMessageAsync(
+        string spaceName, string threadName, object body,
+        CancellationToken ct = default)
+        => PostAsync(spaceName, body, threadName, ct);
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private async Task<string> PostAsync(
